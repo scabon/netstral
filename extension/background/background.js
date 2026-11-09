@@ -214,15 +214,28 @@ function consoleProbeUrls() {
 }
 
 // Extrait tous les chemins d'API cités dans un texte de bundle JS.
+// 3 stratégies (le code minifié ne cite les procédures tRPC que via des
+// chaînes de propriétés, sans guillemets) :
+// 1. littéraux "/api/..." ;
+// 2. littéraux "billing.x.y" ;
+// 3. chaînes de propriétés devant .useQuery/.useMutation/.query/.mutate
+//    (ex. trpc.billing.budget.useQuery) — le premier segment (nom du client
+//    minifié) est retiré.
 function extractApiPaths(text) {
   const found = new Set();
-  const re = /["'`](\/(?:api|trpc|local-trpc)\/[A-Za-z0-9\-_/.{}$]{2,120})["'`]/g;
   let m;
+  const re = /["'`](\/(?:api|trpc|local-trpc)\/[A-Za-z0-9\-_/.{}$]{2,120})["'`]/g;
   while ((m = re.exec(text)) !== null) found.add(m[1]);
-  // les procédures tRPC sont souvent citées sans le préfixe (billing.info,
-  // billing.subscriptions.current...) : capture aussi ce motif.
   const tre = /["'`](billing\.[A-Za-z0-9\-.]{2,60})["'`]/g;
   while ((m = tre.exec(text)) !== null) found.add(`local-trpc:${m[1]}`);
+  const chainRe =
+    /\b([A-Za-z0-9_$][A-Za-z0-9_$-]*(?:\.[A-Za-z0-9_$][A-Za-z0-9_$-]*){1,4})\.(?:useQuery|useMutation|useSuspenseQuery|query|mutate)\s*\(/g;
+  while ((m = chainRe.exec(text)) !== null) {
+    const segs = m[1].split(".");
+    if (segs.length < 2) continue;
+    const proc = segs.slice(1).join(".");
+    if (/^[a-z]/.test(proc)) found.add(`local-trpc:${proc}`);
+  }
   return [...found];
 }
 
@@ -542,7 +555,25 @@ chrome.runtime.onConnect.addListener((port) => {
 
 // ---------- Messages simples (options page) ----------
 
+const KNOWN_TRPC_PROCEDURES = [
+  "billing.budget",
+  "billing.info",
+  "billing.usageLimits",
+  "billing.subscriptions.current",
+  "billing.subscriptions.list",
+  "billing.subscription",
+  "billing.credits",
+  "billing.usage",
+  "billing.payg",
+  "billing.overview",
+];
+
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+// Procédures local-trpc de la famille billing, connues du
+// reverse-engineering public (openchamber #1630) : sondées directement,
+// sans attendre le scan des bundles.
+
+
   if (msg.type === "probeConsole") {
     (async () => {
       // 1. endpoints console candidats (session cookie)
@@ -551,24 +582,34 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         results.push(await fetchSessionText(url));
       }
 
-      // 2. scan du frontend ADMIN (/subscription héberge le « X sur Y »)
+      // 2. sondage direct des procédures local-trpc connues (admin host)
+      const adminProbes = await probeLocalTrpcProcedures(
+        KNOWN_TRPC_PROCEDURES,
+        "https://admin.mistral.ai"
+      );
+
+      // 3. scan du frontend admin avec la nouvelle extraction ; toute
+      // procédure découverte en plus des connues est sondée à son tour.
       let adminScan = null;
-      let adminProbes = [];
       try {
         adminScan = await scanFrontendPages([
           "https://admin.mistral.ai/subscription",
           "https://admin.mistral.ai/",
         ]);
-        const procs = adminScan.apiPaths
+        const found = adminScan.apiPaths
           .filter((p) => p.startsWith("local-trpc:"))
-          .map((p) => p.slice("local-trpc:".length));
-        adminScan.procedures = procs;
-        adminProbes = await probeLocalTrpcProcedures(procs, "https://admin.mistral.ai");
+          .map((p) => p.slice("local-trpc:".length))
+          .filter((p) => !KNOWN_TRPC_PROCEDURES.includes(p));
+        adminScan.procedures = found;
+        for (const p of found.slice(0, 5)) {
+          const r = await probeLocalTrpcProcedures([p], "https://admin.mistral.ai");
+          adminProbes.push(...r);
+        }
       } catch (err) {
         adminScan = { error: String(err) };
       }
 
-      // 3. scan du frontend console (pour la route du chat / clés)
+      // 4. scan du frontend console (pour la route du chat / clés)
       let consoleScan = null;
       try {
         consoleScan = await scanFrontendPages([
