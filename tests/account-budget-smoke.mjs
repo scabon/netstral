@@ -1,8 +1,8 @@
-// Smoke test des sources d'usage du compte (v0.2.3) :
-// 1. crédits console (/api/billing/credits) présents -> badge prioritaire ;
-// 2. crédits console en erreur + allocation admin (billing.budget) OK ->
-//    badge sur l'allocation ;
-// 3. aucune session + budget local -> badge sur le comptage local (0%).
+// Smoke test des sources d'usage du compte (v0.2.8) :
+// 1. admin billing.budget avec vibe_budget -> badge « plan Vibe » (prioritaire) ;
+// 2. console credits (PAYG) en l'absence de session admin -> badge « crédits PAYG » ;
+// 3. admin avec api_budget seulement (pas de vibe_budget) -> badge « allocation API » ;
+// 4. aucune session -> comptage local.
 // Usage : node tests/account-budget-smoke.mjs
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
@@ -21,7 +21,33 @@ const stored = {
 };
 
 let creditsMode = "ok"; // "ok" | "401"
-let adminMode = "ok"; // "ok" | "401"
+let adminMode = "ok"; // "ok" | "ok-no-vibe" | "401"
+
+function adminBudgetJson() {
+  const api = {
+    usage_percentage: 0.0027052,
+    initial_budget: 25.5,
+    currency: "EUR",
+    reset_at: "2026-12-01T00:00:00Z",
+  };
+  const vibe = {
+    usage_percentage: 21.22895086666667,
+    initial_budget: 255,
+    currency: "EUR",
+    reset_at: "2026-12-01T00:00:00Z",
+  };
+  return {
+    result: {
+      data: {
+        json: {
+          ...api,
+          api_budget: api,
+          ...(adminMode === "ok" ? { vibe_budget: vibe } : {}),
+        },
+      },
+    },
+  };
+}
 
 globalThis.fetch = async (url, opts) => {
   if (String(url).includes("console.mistral.ai/api/billing/credits")) {
@@ -46,18 +72,7 @@ globalThis.fetch = async (url, opts) => {
       status: 200,
       redirected: false,
       url,
-      json: async () => ({
-        result: {
-          data: {
-            json: {
-              usage_percentage: 0,
-              initial_budget: 25.5,
-              currency: "EUR",
-              reset_at: "2026-12-01T00:00:00Z",
-            },
-          },
-        },
-      }),
+      json: async () => adminBudgetJson(),
     };
   }
   throw new Error("fetch inattendu: " + url);
@@ -120,7 +135,7 @@ function sendRefresh() {
 
 const lastText = () => badgeCalls.filter((c) => c[0] === "text").pop()?.[1];
 
-async function scenario(name, cMode, aMode, expected) {
+async function scenario(name, cMode, aMode, expectedBadge, expectedTitlePart) {
   creditsMode = cMode;
   adminMode = aMode;
   badgeCalls.length = 0;
@@ -130,34 +145,45 @@ async function scenario(name, cMode, aMode, expected) {
   await sendRefresh();
   const text = lastText();
   const title = titleCalls.at(-1) ?? "";
+  const ok = text === expectedBadge && title.includes(expectedTitlePart);
   console.log(
-    `${name}: badge=${text} titre="${title.slice(0, 70)}"`
+    `${ok ? "PASS" : "FAIL"} ${name}: badge=${text} titre="${title.slice(0, 70)}"`
   );
-  return text === expected;
+  return ok;
 }
 
-const pass1 = await scenario(
-  "crédits console OK (42.78/255)",
-  "ok",
-  "ok",
-  "17%"
+const results = [];
+results.push(
+  await scenario(
+    "vibe_budget prioritaire (21.23% de 255)",
+    "ok",
+    "ok",
+    "21%",
+    "plan Vibe"
+  )
 );
-const pass1b = titleCalls.at(-1)?.includes("crédits console");
+results.push(
+  await scenario(
+    "PAYG console quand admin 401 (42.78/255)",
+    "ok",
+    "401",
+    "17%",
+    "crédits PAYG"
+  )
+);
+results.push(
+  await scenario(
+    "allocation API quand vibe_budget absent",
+    "401",
+    "ok-no-vibe",
+    "0%",
+    "allocation API"
+  )
+);
+results.push(
+  await scenario("aucune session -> comptage local", "401", "401", "0%", "")
+);
 
-const pass2 = await scenario(
-  "credits en erreur -> allocation admin (25.50)",
-  "401",
-  "ok",
-  "0%"
-);
-const pass2b = titleCalls.at(-1)?.includes("allocation Vibe Pro");
-
-const pass3 = await scenario("aucune session -> local (0%)", "401", "401", "0%");
-
-console.log(
-  pass1 && pass1b && pass2 && pass2b && pass3 ? "PASS" : "FAIL",
-  JSON.stringify({ pass1, pass1b, pass2, pass2b, pass3 })
-);
-process.exit(
-  pass1 && pass1b && pass2 && pass2b && pass3 ? 0 : 1
-);
+const pass = results.every(Boolean);
+console.log(pass ? "PASS" : "FAIL");
+process.exit(pass ? 0 : 1);

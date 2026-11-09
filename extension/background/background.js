@@ -157,7 +157,7 @@ function flattenNumeric(obj, prefix = "", depth = 0, out = {}) {
 // chiffres et dates uniquement).
 function safePreview(data) {
   try {
-    return JSON.stringify(data).slice(0, 600);
+    return JSON.stringify(data).slice(0, 1200);
   } catch {
     return "";
   }
@@ -282,6 +282,11 @@ async function probeLocalTrpcProcedures(procedures, origin) {
   return out;
 }
 // Allocation de l'abonnement (Vibe Pro) — secondaire.
+// Réponse réelle (2026-11-09, sonnées via diagnostic) :
+//   { ..., api_budget: {usage_percentage, initial_budget, currency, reset_at},
+//     vibe_budget: {...} } — le %/budget du plan Vibe (affiché par
+//     admin.mistral.ai/subscription) vit dans vibe_budget ; le top-level
+//     ne reflète que l'allocation API.
 async function fetchAccountBudget() {
   const res = await fetchJsonWithSession(BUDGET_URL);
   if (!res.ok) return res;
@@ -289,19 +294,27 @@ async function fetchAccountBudget() {
   if (!data || typeof data !== "object") {
     return { ok: false, error: "Format de réponse inattendu." };
   }
-  if (typeof data.usage_percentage !== "number") {
-    return { ok: false, error: "Champ usage_percentage manquant." };
-  }
+  const pick = (o) =>
+    o && typeof o === "object" && typeof o.usage_percentage === "number"
+      ? {
+          usage_percentage: o.usage_percentage,
+          initial_budget: o.initial_budget ?? null,
+          currency: o.currency ?? "EUR",
+          reset_at: o.reset_at ?? null,
+        }
+      : null;
   const record = {
     fetchedAt: Date.now(),
     source: "admin-budget",
-    usage_percentage: data.usage_percentage,
-    initial_budget: data.initial_budget ?? null,
-    currency: data.currency ?? "EUR",
-    reset_at: data.reset_at ?? null,
+    // priorité d'affichage : vibe (page /subscription) puis api (allocation)
+    vibe: pick(data.vibe_budget),
+    api: pick(data.api_budget) ?? pick(data),
     rawNumeric: flattenNumeric(data),
     rawPreview: safePreview(data),
   };
+  if (!record.vibe && !record.api) {
+    return { ok: false, error: "Aucun budget exploitable dans la réponse." };
+  }
   await chrome.storage.local.set({ accountBudget: record });
   return { ok: true, accountBudget: record };
 }
@@ -363,10 +376,11 @@ async function recordUsage(usage) {
 }
 
 // Met à jour le badge de l'icône. Priorité :
-// 1. crédits PAYG de la console (ce que la console affiche, X€ sur Y€) ;
-// 2. allocation de l'abonnement (admin.billing.budget) ;
-// 3. comptage local « tokens passés par Webstral » vs budget de tokens ;
-// 4. rien.
+// 1. plan Vibe (admin billing.budget.vibe_budget — la page /subscription) ;
+// 2. allocation API incluse dans l'abonnement (api_budget) ;
+// 3. crédits PAYG de la console (wallet non nul) ;
+// 4. comptage local « tokens passés par Webstral » vs budget de tokens ;
+// 5. rien.
 async function updateBadge() {
   const settings = await getSettings();
   const { consoleCredits, accountBudget } = await chrome.storage.local.get([
@@ -386,7 +400,7 @@ async function updateBadge() {
     const cur = record.currency ?? "EUR";
     const amount =
       record.total != null
-        ? `${round2(record.usage_percentage / 100 * record.total)} ${cur} sur ${round2(record.total)} ${cur}`
+        ? `${round2((record.usage_percentage / 100) * record.total)} ${cur} sur ${round2(record.total)} ${cur}`
         : "";
     const title =
       `Webstral — ${record.label} : ${pct}%` + (amount ? ` (${amount})` : "");
@@ -424,23 +438,20 @@ function round2(n) {
 // Choisit la source de % la plus fraîche et la plus pertinente.
 function pickBudgetRecord(consoleCredits, accountBudget) {
   const fresh = (rec) => rec && Date.now() - rec.fetchedAt < BUDGET_TTL_MS;
+  if (fresh(accountBudget)) {
+    if (accountBudget.vibe) {
+      return { ...accountBudget.vibe, total: accountBudget.vibe.initial_budget, label: "plan Vibe" };
+    }
+    if (accountBudget.api) {
+      return { ...accountBudget.api, total: accountBudget.api.initial_budget, label: "allocation API" };
+    }
+  }
   if (
     fresh(consoleCredits) &&
     consoleCredits.usage_percentage != null &&
     (consoleCredits.total ?? 0) > 0
   ) {
-    return { ...consoleCredits, label: "crédits console" };
-  }
-  if (
-    fresh(accountBudget) &&
-    typeof accountBudget.usage_percentage === "number"
-  ) {
-    return {
-      ...accountBudget,
-      // expose initial_budget comme total pour l'affichage « sur X EUR »
-      total: accountBudget.initial_budget,
-      label: "allocation Vibe Pro",
-    };
+    return { ...consoleCredits, label: "crédits PAYG" };
   }
   return null;
 }

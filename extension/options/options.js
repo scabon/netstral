@@ -70,33 +70,33 @@ function renderBudgetView() {
         );
       }
 
-      // Allocation Vibe Pro — secondaire
-      if (st.accountBudget && st.accountBudget.usage_percentage != null) {
+      // Admin billing.budget : plan Vibe (page /subscription) + allocation API
+      if (st.accountBudget) {
         const a = st.accountBudget;
-        const pct = Math.min(100, Math.round(a.usage_percentage));
-        const part =
-          a.initial_budget != null
-            ? ` — ${fmtEUR((a.usage_percentage / 100) * a.initial_budget, a.currency)} sur ${fmtEUR(a.initial_budget, a.currency)}`
-            : "";
-        let extra = "";
-        if (a.reset_at) {
-          const d = new Date(a.reset_at);
-          if (!Number.isNaN(d.getTime()))
-            extra = ` (réinitialisé le ${d.toLocaleDateString("fr-FR")})`;
-        }
+        const subLine = (sub, label) => {
+          if (!sub) return null;
+          const pct = Math.min(100, Math.round(sub.usage_percentage));
+          const part =
+            sub.initial_budget != null
+              ? ` — ${fmtEUR((sub.usage_percentage / 100) * sub.initial_budget, sub.currency)} sur ${fmtEUR(sub.initial_budget, sub.currency)}`
+              : "";
+          let extra = "";
+          if (sub.reset_at) {
+            const d = new Date(sub.reset_at);
+            if (!Number.isNaN(d.getTime()))
+              extra = ` (réinitialisé le ${d.toLocaleDateString("fr-FR")})`;
+          }
+          return `<strong>${label} :</strong> ${pct}%${part}${extra}`;
+        };
         lines.push(
-          `<strong>${BUDGET_LABELS["admin-budget"]} :</strong> ${pct}%${part}${extra}`
+          subLine(a.vibe, "Plan Vibe (page abonnement)") ??
+            "<strong>Plan Vibe</strong> : absent de la réponse"
         );
-        debug.push(
-          "champs allocation : " +
-            Object.entries(a.rawNumeric)
-              .map(([k, v]) => `${k}=${v}`)
-              .join(", ")
-        );
+        const apiLine = subLine(a.api, "Allocation API incluse");
+        if (apiLine) lines.push(apiLine);
+        debug.push("champs admin : " + (a.rawPreview || "(vide)"));
       } else if (st.accountBudgetError) {
-        lines.push(
-          `<strong>${BUDGET_LABELS["admin-budget"]} :</strong> ${st.accountBudgetError}`
-        );
+        lines.push(`<strong>Abonnement :</strong> ${st.accountBudgetError}`);
       }
 
       budgetViewEl.innerHTML = lines.join("<br>");
@@ -104,11 +104,12 @@ function renderBudgetView() {
         budgetDebugEl.textContent = debug.join(" — ");
         budgetDebugEl.classList.remove("hidden");
       }
-      const badgeSource =
-        st.consoleCredits && st.consoleCredits.usage_percentage != null
-          ? "crédits console"
-          : st.accountBudget
-            ? "allocation Vibe Pro"
+      const badgeSource = st.accountBudget?.vibe
+        ? "plan Vibe"
+        : st.accountBudget?.api
+          ? "allocation API"
+          : st.consoleCredits && st.consoleCredits.usage_percentage != null
+            ? "crédits PAYG"
             : null;
       budgetStatusEl.textContent = badgeSource
         ? `Badge : ${badgeSource}`
