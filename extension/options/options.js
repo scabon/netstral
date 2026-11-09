@@ -18,8 +18,8 @@ const fmtEUR = (n, cur = "EUR") =>
   `${n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${cur}`;
 
 const BUDGET_LABELS = {
-  "console-credits": "Crédits console (ce que la console affiche)",
-  "admin-budget": "Allocation Vibe Pro",
+  "console-credits": "Crédits console (wallet PAYG)",
+  "admin-budget": "Abonnement Mistral",
 };
 
 function renderBudgetView() {
@@ -52,8 +52,21 @@ function renderBudgetView() {
               .map(([k, v]) => `${k}=${v}`)
               .join(", ")
         );
+      } else if (st.consoleCredits && st.consoleCredits.total != null) {
+        // champs reconnus
+        const c = st.consoleCredits;
+        const age = Math.round((Date.now() - c.fetchedAt) / 60000);
+        if (c.total === 0) {
+          lines.push(
+            `<strong>${BUDGET_LABELS["console-credits"]} :</strong> vide — aucun crédit prépayé (lu il y a ${age} min)`
+          );
+        } else {
+          lines.push(
+            `<strong>${BUDGET_LABELS["console-credits"]} :</strong> ${fmtEUR(c.spent ?? 0, c.currency)} consommés sur ${fmtEUR(c.total, c.currency)} (lu il y a ${age} min)`
+          );
+        }
       } else if (st.consoleCredits) {
-        // lu, mais sans les champs attendus -> montre le corps brut
+        // réponse reçue mais structure inconnue
         lines.push(
           `<strong>${BUDGET_LABELS["console-credits"]} :</strong> lu, mais champs non reconnus — voir diagnostic`
         );
