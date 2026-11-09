@@ -17,53 +17,95 @@ const budgetDebugEl = document.getElementById("budget-debug");
 const fmtEUR = (n, cur = "EUR") =>
   `${n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${cur}`;
 
+const BUDGET_LABELS = {
+  "console-credits": "Crédits console (ce que la console affiche)",
+  "admin-budget": "Allocation Vibe Pro",
+};
+
 function renderBudgetView() {
   chrome.storage.local
-    .get(["accountBudget", "accountBudgetError"])
-    .then(({ accountBudget, accountBudgetError }) => {
-      if (
-        accountBudget &&
-        typeof accountBudget.usage_percentage === "number"
-      ) {
-        const b = accountBudget;
-        const pct = Math.min(100, Math.round(b.usage_percentage));
-        let line = `Consommation du compte : <strong>${pct}%</strong>`;
-        if (b.initial_budget != null) {
-          const used = (b.usage_percentage / 100) * b.initial_budget;
-          line += ` — ${fmtEUR(used, b.currency)} sur ${fmtEUR(b.initial_budget, b.currency)}`;
-        }
-        if (b.reset_at) {
-          const d = new Date(b.reset_at);
-          if (!Number.isNaN(d.getTime())) {
-            line += ` (réinitialisé le ${d.toLocaleDateString("fr-FR")})`;
-          }
-        }
-        const age = Math.round((Date.now() - b.fetchedAt) / 60000);
-        line += ` — lu il y a ${age} min`;
-        budgetViewEl.innerHTML = line;
-        if (accountBudgetError) {
-          budgetDebugEl.textContent = `Dernier refresh partiel : ${accountBudgetError}`;
-          budgetDebugEl.classList.remove("hidden");
-        }
-        if (b.rawNumeric && Object.keys(b.rawNumeric).length) {
-          budgetDebugEl.textContent =
-            (accountBudgetError ? budgetDebugEl.textContent + " — " : "") +
-            "Champs reçus : " +
-            Object.entries(b.rawNumeric)
+    .get([
+      "consoleCredits",
+      "consoleCreditsError",
+      "accountBudget",
+      "accountBudgetError",
+    ])
+    .then((st) => {
+      const lines = [];
+      const debug = [];
+
+      // Crédits console — source prioritaire
+      if (st.consoleCredits && st.consoleCredits.usage_percentage != null) {
+        const c = st.consoleCredits;
+        const pct = Math.min(100, Math.round(c.usage_percentage));
+        const part =
+          c.total != null
+            ? ` — ${fmtEUR(c.spent, c.currency)} sur ${fmtEUR(c.total, c.currency)}`
+            : "";
+        const age = Math.round((Date.now() - c.fetchedAt) / 60000);
+        lines.push(
+          `<strong>${BUDGET_LABELS["console-credits"]} :</strong> ${pct}%${part} (lu il y a ${age} min)`
+        );
+        debug.push(
+          "champs console : " +
+            Object.entries(c.rawNumeric)
               .map(([k, v]) => `${k}=${v}`)
-              .join(", ");
-          budgetDebugEl.classList.remove("hidden");
-        }
-        budgetStatusEl.textContent = "";
-        budgetStatusEl.className = "";
+              .join(", ")
+        );
+      } else if (st.consoleCreditsError) {
+        lines.push(
+          `<strong>${BUDGET_LABELS["console-credits"]} :</strong> ${st.consoleCreditsError}`
+        );
       } else {
-        budgetViewEl.innerHTML =
-          "Pas encore de lecture. Connectez-vous à console.mistral.ai puis « Actualiser ».";
-        if (accountBudgetError) {
-          budgetStatusEl.textContent = accountBudgetError;
-          budgetStatusEl.className = "err";
-        }
+        lines.push(
+          `<strong>${BUDGET_LABELS["console-credits"]} :</strong> pas encore lu`
+        );
       }
+
+      // Allocation Vibe Pro — secondaire
+      if (st.accountBudget && st.accountBudget.usage_percentage != null) {
+        const a = st.accountBudget;
+        const pct = Math.min(100, Math.round(a.usage_percentage));
+        const part =
+          a.initial_budget != null
+            ? ` — ${fmtEUR((a.usage_percentage / 100) * a.initial_budget, a.currency)} sur ${fmtEUR(a.initial_budget, a.currency)}`
+            : "";
+        let extra = "";
+        if (a.reset_at) {
+          const d = new Date(a.reset_at);
+          if (!Number.isNaN(d.getTime()))
+            extra = ` (réinitialisé le ${d.toLocaleDateString("fr-FR")})`;
+        }
+        lines.push(
+          `<strong>${BUDGET_LABELS["admin-budget"]} :</strong> ${pct}%${part}${extra}`
+        );
+        debug.push(
+          "champs allocation : " +
+            Object.entries(a.rawNumeric)
+              .map(([k, v]) => `${k}=${v}`)
+              .join(", ")
+        );
+      } else if (st.accountBudgetError) {
+        lines.push(
+          `<strong>${BUDGET_LABELS["admin-budget"]} :</strong> ${st.accountBudgetError}`
+        );
+      }
+
+      budgetViewEl.innerHTML = lines.join("<br>");
+      if (debug.length) {
+        budgetDebugEl.textContent = debug.join(" — ");
+        budgetDebugEl.classList.remove("hidden");
+      }
+      const badgeSource =
+        st.consoleCredits && st.consoleCredits.usage_percentage != null
+          ? "crédits console"
+          : st.accountBudget
+            ? "allocation Vibe Pro"
+            : null;
+      budgetStatusEl.textContent = badgeSource
+        ? `Badge : ${badgeSource}`
+        : "Badge : comptage local";
+      budgetStatusEl.className = badgeSource ? "ok" : "";
     });
 }
 
@@ -75,8 +117,13 @@ btnBudget.addEventListener("click", () => {
       budgetStatusEl.className = "err";
       return;
     }
-    if (res?.accountBudgetError && !res?.accountBudget) {
-      budgetStatusEl.textContent = res.accountBudgetError;
+    const creditsErr = res?.consoleCreditsError;
+    const adminErr = res?.accountBudgetError;
+    if (!res) {
+      budgetStatusEl.textContent = "Pas de réponse du fond.";
+      budgetStatusEl.className = "err";
+    } else if (creditsErr && adminErr) {
+      budgetStatusEl.textContent = creditsErr;
       budgetStatusEl.className = "err";
     } else {
       budgetStatusEl.textContent = "OK";
@@ -200,7 +247,11 @@ loadBadgeSettings();
 // Le compteur d'usage bouge après un tour de chat : on se met à jour.
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && changes.usage) loadBadgeSettings();
-  if (area === "local" && changes.accountBudget) renderBudgetView();
+  if (
+    area === "local" &&
+    (changes.accountBudget || changes.consoleCredits)
+  )
+    renderBudgetView();
 });
 
 // Sauvegarde la clé dès qu'elle change (débouncée).

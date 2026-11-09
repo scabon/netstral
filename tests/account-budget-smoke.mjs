@@ -1,7 +1,8 @@
-// Smoke test du mode « usage réel du compte » : le message refreshBudget
-// déclenche fetchAccountBudget (mock tRPC billing.budget) puis updateBadge —
-// le badge doit refléter usage_percentage du compte (et non le comptage
-// local). Vérifie aussi le repli local quand la session est absente (302).
+// Smoke test des sources d'usage du compte (v0.2.3) :
+// 1. crédits console (/api/billing/credits) présents -> badge prioritaire ;
+// 2. crédits console en erreur + allocation admin (billing.budget) OK ->
+//    badge sur l'allocation ;
+// 3. aucune session + budget local -> badge sur le comptage local (0%).
 // Usage : node tests/account-budget-smoke.mjs
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
@@ -19,29 +20,38 @@ const stored = {
   settings: { monthlyBudgetTokens: 100, warnPct: 70, dangerPct: 90 },
 };
 
-let fetchMode = "ok"; // "ok" | "redirect"
+let creditsMode = "ok"; // "ok" | "401"
+let adminMode = "ok"; // "ok" | "401"
 
 globalThis.fetch = async (url, opts) => {
-  if (String(url).includes("billing.budget")) {
-    if (fetchMode === "redirect") {
-      return {
-        ok: true,
-        redirected: true,
-        url: "https://auth.mistral.ai/self-service/login/browser",
-        status: 200,
-      };
-    }
+  if (String(url).includes("console.mistral.ai/api/billing/credits")) {
+    if (creditsMode === "401") return { ok: false, status: 401, redirected: false, url };
     return {
       ok: true,
       status: 200,
       redirected: false,
-      url: "https://admin.mistral.ai/api/local-trpc/billing.budget",
+      url,
+      json: async () => ({
+        wallet_amount: 255,
+        credit_notes_amount: 0,
+        ongoing_usage_balance: 42.78,
+        currency: "EUR",
+      }),
+    };
+  }
+  if (String(url).includes("billing.budget")) {
+    if (adminMode === "401") return { ok: false, status: 401, redirected: false, url };
+    return {
+      ok: true,
+      status: 200,
+      redirected: false,
+      url,
       json: async () => ({
         result: {
           data: {
             json: {
-              usage_percentage: 16.78,
-              initial_budget: 255,
+              usage_percentage: 0,
+              initial_budget: 25.5,
               currency: "EUR",
               reset_at: "2026-12-01T00:00:00Z",
             },
@@ -56,8 +66,12 @@ globalThis.fetch = async (url, opts) => {
 const chromeMock = {
   storage: {
     local: {
-      get: async (k) =>
-        typeof k === "string" ? { [k]: stored[k] } : Object.fromEntries((k).map((x) => [x, stored[x]])),
+      get: async (k) => {
+        const want = typeof k === "string" ? [k] : k;
+        const out = {};
+        for (const key of want) if (key in stored) out[key] = stored[key];
+        return out;
+      },
       set: async (obj) => Object.assign(stored, obj),
       remove: async (k) => {
         for (const key of Array.isArray(k) ? k : [k]) delete stored[key];
@@ -104,33 +118,46 @@ function sendRefresh() {
   });
 }
 
-function lastText() {
-  return badgeCalls.filter((c) => c[0] === "text").pop()?.[1];
+const lastText = () => badgeCalls.filter((c) => c[0] === "text").pop()?.[1];
+
+async function scenario(name, cMode, aMode, expected) {
+  creditsMode = cMode;
+  adminMode = aMode;
+  badgeCalls.length = 0;
+  titleCalls.length = 0;
+  stored.consoleCredits = null;
+  stored.accountBudget = null;
+  await sendRefresh();
+  const text = lastText();
+  const title = titleCalls.at(-1) ?? "";
+  console.log(
+    `${name}: badge=${text} titre="${title.slice(0, 70)}"`
+  );
+  return text === expected;
 }
 
-// --- scénario 1 : session OK -> badge = % du compte
-await sendRefresh();
-console.log("badge après lecture compte:", lastText());
-console.log("titre:", titleCalls.at(-1));
-const storedBudget = stored.accountBudget;
-const pass1 =
-  lastText() === "17%" &&
-  badgeCalls.some((c) => c[0] === "bg" && c[1] === "#1a7f37") &&
-  storedBudget?.usage_percentage === 16.78 &&
-  storedBudget?.initial_budget === 255 &&
-  !("accountBudgetError" in stored) &&
-  (titleCalls.at(-1) ?? "").includes("17%");
+const pass1 = await scenario(
+  "crédits console OK (42.78/255)",
+  "ok",
+  "ok",
+  "17%"
+);
+const pass1b = titleCalls.at(-1)?.includes("crédits console");
 
-// --- scénario 2 : session absente, aucune donnée fraîche -> repli local
-badgeCalls.length = 0;
-fetchMode = "redirect";
-delete stored.accountBudget;
-await sendRefresh();
-console.log("badge sans session:", lastText(), "| erreur:", stored.accountBudgetError);
-const pass2 =
-  lastText() === "0%" &&
-  typeof stored.accountBudgetError === "string" &&
-  stored.accountBudgetError.includes("Session");
+const pass2 = await scenario(
+  "credits en erreur -> allocation admin (25.50)",
+  "401",
+  "ok",
+  "0%"
+);
+const pass2b = titleCalls.at(-1)?.includes("allocation Vibe Pro");
 
-console.log(pass1 && pass2 ? "PASS" : "FAIL");
-process.exit(pass1 && pass2 ? 0 : 1);
+const pass3 = await scenario("aucune session -> local (0%)", "401", "401", "0%");
+
+console.log(
+  pass1 && pass1b && pass2 && pass2b && pass3 ? "PASS" : "FAIL",
+  JSON.stringify({ pass1, pass1b, pass2, pass2b, pass3 })
+);
+process.exit(
+  pass1 && pass1b && pass2 && pass2b && pass3 ? 0 : 1
+);

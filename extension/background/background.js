@@ -61,24 +61,28 @@ async function getApiKey() {
 }
 
 // ---------- Usage réel du compte (session console) ----------
-// Le % « X€ sur Y€ » affiché par la console/account Mistral est servi par
-// le BFF tRPC de l'app de facturation : GET admin.mistral.ai/api/local-trpc/
-// billing.budget, authentifié par le cookie de session Ory (domaine
-// .mistral.ai). On le lit avec les cookies du navigateur connecté ;
-// sans session (401/302/login) on retombe sur le comptage local.
+// Deux quantités distinctes, toutes deux lues avec le cookie de session
+// Mistral (domaine .mistral.ai) du navigateur connecté :
+// 1. console.mistral.ai/api/billing/credits — les crédits PAYG de la
+//    console (« X€ sur Y€ ») : wallet_amount, credit_notes_amount,
+//    ongoing_usage_balance. C'est la source prioritaire du badge.
+// 2. admin.mistral.ai/api/local-trpc/billing.budget — le budget de
+//    l'abonnement (allocation API incluse dans Vibe Pro), en second.
+// Sans session (401/302/login) on retombe sur le comptage local.
 
+const CREDITS_URL = "https://console.mistral.ai/api/billing/credits";
 const BUDGET_URL =
   "https://admin.mistral.ai/api/local-trpc/billing.budget?input=" +
   encodeURIComponent('{"json":null,"meta":{"values":["undefined"],"v":1}}');
 const BUDGET_TTL_MS = 60 * 60 * 1000; // 1 h
 const BUDGET_ALARM = "webstral-budget-refresh";
 
-async function fetchAccountBudget() {
+async function fetchJsonWithSession(url) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 10000);
   let response;
   try {
-    response = await fetch(BUDGET_URL, {
+    response = await fetch(url, {
       credentials: "include",
       signal: ctrl.signal,
     });
@@ -96,13 +100,53 @@ async function fetchAccountBudget() {
   if (!response.ok) {
     return { ok: false, error: `HTTP ${response.status}` };
   }
-  let body;
   try {
-    body = await response.json();
+    return { ok: true, json: await response.json() };
   } catch {
     return { ok: false, error: "Réponse non-JSON (session invalide ?)" };
   }
-  const data = body?.result?.data?.json ?? body?.result?.data ?? null;
+}
+
+// Crédits PAYG de la console (source prioritaire).
+async function fetchConsoleCredits() {
+  const res = await fetchJsonWithSession(CREDITS_URL);
+  if (!res.ok) return res;
+  const data = res.json;
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    return { ok: false, error: "Format de réponse inattendu (credits)." };
+  }
+  const num = (v) => (typeof v === "number" ? v : null);
+  const wallet = num(data.wallet_amount);
+  const notes = num(data.credit_notes_amount);
+  const ongoing = num(data.ongoing_usage_balance);
+  const total =
+    wallet != null || notes != null ? (wallet ?? 0) + (notes ?? 0) : null;
+  const record = {
+    fetchedAt: Date.now(),
+    source: "console-credits",
+    wallet_amount: wallet,
+    credit_notes_amount: notes,
+    ongoing_usage_balance: ongoing,
+    spent: ongoing, // hypothèse : ongoing = consommé ; debug pour confirmer
+    total,
+    currency: typeof data.currency === "string" ? data.currency : "EUR",
+    usage_percentage:
+      total != null && total > 0 && ongoing != null
+        ? (ongoing / total) * 100
+        : null,
+    rawNumeric: Object.fromEntries(
+      Object.entries(data).filter(([, v]) => typeof v === "number")
+    ),
+  };
+  await chrome.storage.local.set({ consoleCredits: record });
+  return { ok: true, consoleCredits: record };
+}
+
+// Allocation de l'abonnement (Vibe Pro) — secondaire.
+async function fetchAccountBudget() {
+  const res = await fetchJsonWithSession(BUDGET_URL);
+  if (!res.ok) return res;
+  const data = res.json?.result?.data?.json ?? res.json?.result?.data ?? null;
   if (!data || typeof data !== "object") {
     return { ok: false, error: "Format de réponse inattendu." };
   }
@@ -111,6 +155,7 @@ async function fetchAccountBudget() {
   }
   const record = {
     fetchedAt: Date.now(),
+    source: "admin-budget",
     usage_percentage: data.usage_percentage,
     initial_budget: data.initial_budget ?? null,
     currency: data.currency ?? "EUR",
@@ -124,13 +169,23 @@ async function fetchAccountBudget() {
 }
 
 async function refreshBudgetAndBadge() {
-  const res = await fetchAccountBudget();
-  if (!res.ok) {
-    // la donnée précédente reste affichée si elle est encore fraîche ;
-    // sinon updateBadge retombera sur le comptage local.
-    await chrome.storage.local.set({ accountBudgetError: res.error });
-  } else {
-    await chrome.storage.local.remove("accountBudgetError");
+  const [creditsRes, adminRes] = await Promise.allSettled([
+    fetchConsoleCredits(),
+    fetchAccountBudget(),
+  ]);
+  if (creditsRes.status === "fulfilled") {
+    const r = creditsRes.value;
+    await chrome.storage.local.set(
+      r.ok
+        ? { consoleCreditsError: null }
+        : { consoleCreditsError: r.error }
+    );
+  }
+  if (adminRes.status === "fulfilled") {
+    const r = adminRes.value;
+    await chrome.storage.local.set(
+      r.ok ? { accountBudgetError: null } : { accountBudgetError: r.error }
+    );
   }
   await updateBadge();
 }
@@ -169,31 +224,34 @@ async function recordUsage(usage) {
   await chrome.storage.local.set({ usage: all });
 }
 
-// Met à jour le badge de l'icône. Priorité : usage réel du compte lu
-// depuis la session Mistral (billing.budget) ; sinon comptage local
-// « tokens passés par Webstral » vs budget de tokens ; sinon rien.
+// Met à jour le badge de l'icône. Priorité :
+// 1. crédits PAYG de la console (ce que la console affiche, X€ sur Y€) ;
+// 2. allocation de l'abonnement (admin.billing.budget) ;
+// 3. comptage local « tokens passés par Webstral » vs budget de tokens ;
+// 4. rien.
 async function updateBadge() {
   const settings = await getSettings();
-  const { accountBudget } = await chrome.storage.local.get("accountBudget");
+  const { consoleCredits, accountBudget } = await chrome.storage.local.get([
+    "consoleCredits",
+    "accountBudget",
+  ]);
 
-  if (
-    accountBudget &&
-    Date.now() - accountBudget.fetchedAt < BUDGET_TTL_MS &&
-    typeof accountBudget.usage_percentage === "number"
-  ) {
-    const pct = Math.min(100, Math.round(accountBudget.usage_percentage));
+  const record = pickBudgetRecord(consoleCredits, accountBudget);
+  if (record) {
+    const pct = Math.min(100, Math.round(record.usage_percentage));
     const color =
       pct >= settings.dangerPct
         ? "#b3261e"
         : pct >= settings.warnPct
           ? "#f9a825"
           : "#1a7f37";
-    const budget = accountBudget.initial_budget;
-    const cur = accountBudget.currency ?? "EUR";
+    const cur = record.currency ?? "EUR";
+    const amount =
+      record.total != null
+        ? `${round2(record.usage_percentage / 100 * record.total)} ${cur} sur ${round2(record.total)} ${cur}`
+        : "";
     const title =
-      budget != null
-        ? `Webstral — consommation du compte : ${pct}% de ${budget} ${cur}`
-        : `Webstral — consommation du compte : ${pct}%`;
+      `Webstral — ${record.label} : ${pct}%` + (amount ? ` (${amount})` : "");
     await chrome.action.setTitle({ title });
     await chrome.action.setBadgeBackgroundColor({ color });
     await chrome.action.setBadgeText({ text: `${pct}%` });
@@ -219,6 +277,34 @@ async function updateBadge() {
         : "#1a7f37"; // vert
   await chrome.action.setBadgeBackgroundColor({ color });
   await chrome.action.setBadgeText({ text: `${pct}%` });
+}
+
+function round2(n) {
+  return Math.round(n * 100) / 100;
+}
+
+// Choisit la source de % la plus fraîche et la plus pertinente.
+function pickBudgetRecord(consoleCredits, accountBudget) {
+  const fresh = (rec) => rec && Date.now() - rec.fetchedAt < BUDGET_TTL_MS;
+  if (
+    fresh(consoleCredits) &&
+    consoleCredits.usage_percentage != null &&
+    (consoleCredits.total ?? 0) > 0
+  ) {
+    return { ...consoleCredits, label: "crédits console" };
+  }
+  if (
+    fresh(accountBudget) &&
+    typeof accountBudget.usage_percentage === "number"
+  ) {
+    return {
+      ...accountBudget,
+      // expose initial_budget comme total pour l'affichage « sur X EUR »
+      total: accountBudget.initial_budget,
+      label: "allocation Vibe Pro",
+    };
+  }
+  return null;
 }
 
 // ---------- Chat en streaming ----------
@@ -294,10 +380,17 @@ async function streamChat(port, apiKey, { model, messages }) {
   port.postMessage({ type: "done", usage });
   await recordUsage(usage);
   await updateBadge();
-  // refraîchit l'usage réel du compte, sans marteler le BFF (throttle 5 min)
-  const { accountBudget } = await chrome.storage.local.get("accountBudget");
-  if (!accountBudget || Date.now() - accountBudget.fetchedAt > 5 * 60 * 1000) {
-    fetchAccountBudget().then(() => updateBadge());
+  // refraîchit l'usage réel du compte, sans marteler les endpoints (throttle 5 min)
+  const { accountBudget, consoleCredits } = await chrome.storage.local.get([
+    "accountBudget",
+    "consoleCredits",
+  ]);
+  const last = Math.max(
+    accountBudget?.fetchedAt ?? 0,
+    consoleCredits?.fetchedAt ?? 0
+  );
+  if (Date.now() - last > 5 * 60 * 1000) {
+    refreshBudgetAndBadge().catch(() => {});
   }
 }
 
@@ -328,7 +421,12 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === "refreshBudget") {
     refreshBudgetAndBadge()
       .then(() =>
-        chrome.storage.local.get(["accountBudget", "accountBudgetError"])
+        chrome.storage.local.get([
+          "consoleCredits",
+          "consoleCreditsError",
+          "accountBudget",
+          "accountBudgetError",
+        ])
       )
       .then(sendResponse);
     return true; // réponse asynchrone
