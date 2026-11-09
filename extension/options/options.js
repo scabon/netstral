@@ -154,6 +154,43 @@ function setStatus(text, kind) {
   statusEl.className = kind ?? "";
 }
 
+const ORIGINS = [
+  "https://api.mistral.ai/*",
+  "https://admin.mistral.ai/*",
+  "https://console.mistral.ai/*",
+];
+
+const permViewEl = document.getElementById("perm-view");
+const btnPerms = document.getElementById("btn-perms");
+
+// Firefox MV3 n'accorde pas les host_permissions à l'installation (opt-in) :
+// tant qu'elles ne sont pas accordées, les appels API et la lecture du
+// budget échouent. Chrome les accorde automatiquement (bouton masqué).
+async function refreshPermsView() {
+  const has = await chrome.permissions.contains({ origins: ORIGINS });
+  if (has) {
+    permViewEl.textContent =
+      "Accès réseau accordé (api.mistral.ai, admin.mistral.ai, console.mistral.ai).";
+    btnPerms.classList.add("hidden");
+  } else {
+    permViewEl.textContent =
+      "Accès réseau non accordé : activez-le pour que le chat et le badge fonctionnent.";
+    btnPerms.classList.remove("hidden");
+  }
+}
+
+btnPerms.addEventListener("click", async () => {
+  const granted = await chrome.permissions.request({ origins: ORIGINS });
+  if (!granted) {
+    permViewEl.textContent =
+      "Accès refusé. Il peut aussi être accordé depuis about:addons → Webstral → Permissions.";
+    return;
+  }
+  await refreshPermsView();
+});
+
+refreshPermsView();
+
 // Charge la clé existante (affichée masquée, toggle possible).
 chrome.storage.local.get("apiKey").then(({ apiKey }) => {
   keyInput.value = apiKey ?? "";

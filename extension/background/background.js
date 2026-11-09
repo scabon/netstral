@@ -4,10 +4,29 @@
 
 const API_BASE = "https://api.mistral.ai/v1";
 
+// Cross-browser : Chrome = side panel, Firefox = sidebar.
+// - Chrome : chrome.sidePanel.setPanelBehavior ouvre le side panel au clic
+//   sur l'icône (l'API n'existe pas sur Firefox).
+// - Firefox : chrome.sidebarAction.open() depuis le handler action.onClicked.
+function setOpenPanelOnAction() {
+  if (chrome.sidePanel?.setPanelBehavior) {
+    chrome.sidePanel
+      .setPanelBehavior({ openPanelOnActionClick: true })
+      .catch((err) => console.error("setPanelBehavior failed:", err));
+  } else if (chrome.sidebarAction?.open) {
+    chrome.action.onClicked.addListener((tab) => {
+      try {
+        const p = chrome.sidebarAction.open({ windowId: tab.windowId });
+        p?.catch?.((err) => console.error("sidebarAction.open failed:", err));
+      } catch (err) {
+        console.error("sidebarAction.open failed:", err);
+      }
+    });
+  }
+}
+
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.sidePanel
-    .setPanelBehavior({ openPanelOnActionClick: true })
-    .catch((err) => console.error("setPanelBehavior failed:", err));
+  setOpenPanelOnAction();
   ensureBudgetAlarm();
   refreshBudgetAndBadge().catch((err) =>
     console.error("budget refresh failed:", err)
@@ -15,9 +34,7 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 chrome.runtime.onStartup?.addListener(() => {
-  chrome.sidePanel
-    .setPanelBehavior({ openPanelOnActionClick: true })
-    .catch((err) => console.error("setPanelBehavior failed:", err));
+  setOpenPanelOnAction();
   ensureBudgetAlarm();
   updateBadge().catch((err) => console.error("updateBadge failed:", err));
 });
