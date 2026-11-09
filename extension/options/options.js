@@ -136,6 +136,13 @@ btnProbe.addEventListener("click", () => {
       if (p.text) lines.push(p.text.replace(/\s+/g, " ").slice(0, 250));
       lines.push("");
     }
+    const scan = res?.scan;
+    if (scan) {
+      lines.push(
+        `--- scan frontend : ${scan.bundles ?? "?"} bundles analysés, ${scan.apiPaths?.length ?? 0} chemins d'API trouvés ---`
+      );
+      for (const p of scan.apiPaths ?? []) lines.push(p);
+    }
     probeViewEl.textContent = lines.join("\n") || "Aucune réponse.";
   });
 });

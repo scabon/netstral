@@ -167,9 +167,9 @@ function safePreview(data) {
 // Sonne les endpoints candidats avec la session : statut + aperçu du corps.
 // Sert à cartographier la vraie API console (non documentée) en un clic.
 
-async function fetchSessionText(url) {
+async function fetchSessionText(url, maxLen = 700) {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 10000);
+  const timer = setTimeout(() => ctrl.abort(), 15000);
   let response;
   try {
     response = await fetch(url, {
@@ -183,7 +183,8 @@ async function fetchSessionText(url) {
   }
   let text = "";
   try {
-    text = (await response.text()).slice(0, 700);
+    text = await response.text();
+    if (maxLen != null && text.length > maxLen) text = text.slice(0, maxLen);
   } catch {
     text = "<corps illisible>";
   }
@@ -200,12 +201,56 @@ function consoleProbeUrls() {
   const end = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   return [
     "https://console.mistral.ai/api/billing/credits",
-    `https://console.mistral.ai/api/billing/usage?start_date=${start}&end_date=${end}`,
-    `https://console.mistral.ai/api/billing/usage/monthly?start_date=${start}&end_date=${end}`,
-    "https://console.mistral.ai/api/billing/subscription",
-    "https://console.mistral.ai/api/billing/payg",
-    "https://console.mistral.ai/api/vibe/account-context",
+    "https://console.mistral.ai/api/users/organizations",
+    "https://console.mistral.ai/api/v1/usage",
+    `https://console.mistral.ai/api/v1/usage?start_date=${start}&end_date=${end}`,
+    `https://console.mistral.ai/api/v1/usage/monthly?start_date=${start}&end_date=${end}`,
+    "https://console.mistral.ai/api/v1/billing/usage",
+    "https://console.mistral.ai/api/v1/billing/overview",
+    "https://console.mistral.ai/api/v1/billing",
+    "https://console.mistral.ai/api/usage/summary",
+    "https://console.mistral.ai/api/billing/overview",
   ];
+}
+
+// Extrait tous les chemins d'API cités dans un texte de bundle JS.
+function extractApiPaths(text) {
+  const found = new Set();
+  const re = /["'`](\/(?:api|trpc|local-trpc)\/[A-Za-z0-9\-_/.{}$]{2,120})["'`]/g;
+  let m;
+  while ((m = re.exec(text)) !== null) found.add(m[1]);
+  return [...found];
+}
+
+// Scan du frontend console avec la session : récupère les bundles JS
+// chargés par les pages candidats et en extrait les chemins d'API.
+async function scanConsoleFrontend() {
+  const routes = [
+    "https://console.mistral.ai/",
+    "https://console.mistral.ai/usage",
+    "https://console.mistral.ai/billing",
+  ];
+  const scriptUrls = new Set();
+  const apiPaths = new Set();
+  for (const route of routes) {
+    const page = await fetchSessionText(route, 20000);
+    if (!page.text || !page.text.includes("<script")) continue;
+    const srcRe = /<script[^>]+src="([^"]+)"/g;
+    let m;
+    while ((m = srcRe.exec(page.text)) !== null) {
+      const src = m[1];
+      if (src.startsWith("http")) scriptUrls.add(src);
+      else if (src.startsWith("/")) scriptUrls.add(`https://console.mistral.ai${src}`);
+    }
+    for (const p of extractApiPaths(page.text)) apiPaths.add(p);
+  }
+  // plafonne le nombre de bundles analysés (taille réseau)
+  const bundles = [...scriptUrls].filter((u) => u.endsWith(".js")).slice(0, 12);
+  for (const url of bundles) {
+    const js = await fetchSessionText(url, 300000);
+    for (const p of extractApiPaths(js.text)) apiPaths.add(p);
+  }
+  return { routes: routes.length, bundles: bundles.length, apiPaths: [...apiPaths].sort() };
 }
 // Allocation de l'abonnement (Vibe Pro) — secondaire.
 async function fetchAccountBudget() {
@@ -486,10 +531,15 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     (async () => {
       const results = [];
       for (const url of consoleProbeUrls()) {
-        const r = await fetchSessionText(url);
-        results.push(r);
+        results.push(await fetchSessionText(url));
       }
-      sendResponse({ probes: results });
+      let scan = null;
+      try {
+        scan = await scanConsoleFrontend();
+      } catch (err) {
+        scan = { error: String(err) };
+      }
+      sendResponse({ probes: results, scan });
     })();
     return true; // réponse asynchrone
   }
