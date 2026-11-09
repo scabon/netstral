@@ -123,6 +123,12 @@ function renderConversation() {
     const el = bubble(m.role);
     el.innerHTML =
       m.role === "user" ? escapeHtml(m.content) : renderMarkdown(m.content);
+    if (m.role === "assistant" && m.usage) {
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      meta.textContent = `${m.usage.prompt_tokens} tokens in, ${m.usage.completion_tokens} tokens out`;
+      chatEl.appendChild(meta);
+    }
   }
   chatEl.scrollTop = chatEl.scrollHeight;
 }
@@ -174,16 +180,14 @@ function ensurePort() {
       }
     } else if (msg.type === "done") {
       finishStreaming();
-      if (msg.usage) {
-        const { prompt_tokens = 0, completion_tokens = 0 } = msg.usage;
-        const last = chatEl.lastElementChild;
-        if (last) {
-          const meta = document.createElement("div");
-          meta.className = "meta";
-          meta.textContent = `${prompt_tokens} tokens in, ${completion_tokens} tokens out`;
-          chatEl.appendChild(meta);
-          chatEl.scrollTop = chatEl.scrollHeight;
-        }
+      const last = conversation[conversation.length - 1];
+      if (msg.usage && last?.role === "assistant") {
+        last.usage = msg.usage;
+        const meta = document.createElement("div");
+        meta.className = "meta";
+        meta.textContent = `${msg.usage.prompt_tokens} tokens in, ${msg.usage.completion_tokens} tokens out`;
+        chatEl.appendChild(meta);
+        chatEl.scrollTop = chatEl.scrollHeight;
       }
       saveConversation();
     } else if (msg.type === "error") {

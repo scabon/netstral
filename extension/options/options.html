@@ -39,6 +39,26 @@
     </section>
 
     <section>
+      <h2>Budget mensuel &amp; badge</h2>
+      <p>
+        Le badge de l'icône affiche le pourcentage des tokens API consommés
+        ce mois-ci par rapport au budget ci-dessous (comptage local, par
+        mois calendaire).
+      </p>
+      <div class="row">
+        <label for="budget">Budget mensuel (tokens)</label>
+        <input type="number" id="budget" min="0" placeholder="ex. 2000000" style="width: 160px">
+      </div>
+      <div class="row">
+        <label for="warn-pct">Badge orange à (%)</label>
+        <input type="number" id="warn-pct" min="1" max="99" style="width: 70px">
+        <label for="danger-pct">rouge à (%)</label>
+        <input type="number" id="danger-pct" min="2" max="100" style="width: 70px">
+      </div>
+      <p id="usage-now" class="note"></p>
+    </section>
+
+    <section>
       <h2>À venir</h2>
       <p class="note">
         Badge de consommation de tokens sur l'icône, clé Admin Mistral pour le

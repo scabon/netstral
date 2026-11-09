@@ -12,7 +12,10 @@ const code = readFileSync(
 const connectListeners = [];
 const sent = [];
 const chromeMock = {
-  storage: { local: { get: async (k) => ({ apiKey: "bad-key" }) } },
+  storage: {
+    local: { get: async (k) => ({ apiKey: "bad-key" }) },
+    onChanged: { addListener: () => {} },
+  },
   runtime: {
     onInstalled: { addListener: () => {} },
     onStartup: { addListener: () => {} },
@@ -20,6 +23,10 @@ const chromeMock = {
     onMessage: { addListener: () => {} },
   },
   sidePanel: { setPanelBehavior: async () => {} },
+  action: {
+    setBadgeText: async () => {},
+    setBadgeBackgroundColor: async () => {},
+  },
 };
 
 globalThis.fetch = async () => ({

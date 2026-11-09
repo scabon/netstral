@@ -8,17 +8,81 @@ chrome.runtime.onInstalled.addListener(() => {
   chrome.sidePanel
     .setPanelBehavior({ openPanelOnActionClick: true })
     .catch((err) => console.error("setPanelBehavior failed:", err));
+  updateBadge();
 });
 
 chrome.runtime.onStartup?.addListener(() => {
   chrome.sidePanel
     .setPanelBehavior({ openPanelOnActionClick: true })
     .catch((err) => console.error("setPanelBehavior failed:", err));
+  updateBadge();
+});
+
+// Rafraîchit le badge quand le budget, les seuils ou le compteur changent
+// (la page options écrit, le badge doit refléter immédiatement).
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && (changes.settings || changes.usage)) {
+    updateBadge();
+  }
 });
 
 async function getApiKey() {
   const { apiKey } = await chrome.storage.local.get("apiKey");
   return apiKey;
+}
+
+// ---------- Compteur d'usage + badge ----------
+
+const DEFAULT_SETTINGS = {
+  monthlyBudgetTokens: null, // null = pas de badge
+  warnPct: 70,
+  dangerPct: 90,
+};
+
+function monthKey(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+async function getSettings() {
+  const { settings } = await chrome.storage.local.get("settings");
+  return { ...DEFAULT_SETTINGS, ...(settings ?? {}) };
+}
+
+// Cumule le usage d'un tour dans l'entrée du mois courant.
+async function recordUsage(usage) {
+  if (!usage) return;
+  const key = monthKey();
+  const { usage: all = {} } = await chrome.storage.local.get("usage");
+  const cur = all[key] ?? { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
+  cur.prompt_tokens += usage.prompt_tokens ?? 0;
+  cur.completion_tokens += usage.completion_tokens ?? 0;
+  cur.total_tokens += usage.total_tokens ?? 0;
+  all[key] = cur;
+  await chrome.storage.local.set({ usage: all });
+}
+
+// Met à jour le badge de l'icône : % de la consommation API du mois
+// par rapport au budget configuré, vert -> orange -> rouge selon seuils.
+async function updateBadge() {
+  const settings = await getSettings();
+  if (!settings.monthlyBudgetTokens) {
+    await chrome.action.setBadgeText({ text: "" });
+    return;
+  }
+  const { usage: all = {} } = await chrome.storage.local.get("usage");
+  const spent = all[monthKey()]?.total_tokens ?? 0;
+  const pct = Math.min(
+    100,
+    Math.floor((spent / settings.monthlyBudgetTokens) * 100)
+  );
+  const color =
+    pct >= settings.dangerPct
+      ? "#b3261e" // rouge
+      : pct >= settings.warnPct
+        ? "#f9a825" // orange
+        : "#1a7f37"; // vert
+  await chrome.action.setBadgeBackgroundColor({ color });
+  await chrome.action.setBadgeText({ text: `${pct}%` });
 }
 
 // ---------- Chat en streaming ----------
@@ -92,6 +156,8 @@ async function streamChat(port, apiKey, { model, messages }) {
   }
 
   port.postMessage({ type: "done", usage });
+  await recordUsage(usage);
+  await updateBadge();
 }
 
 // ---------- Ports (side panel) ----------

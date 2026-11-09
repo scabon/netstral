@@ -49,6 +49,22 @@ section p {
   display: flex;
   gap: 8px;
   align-items: center;
+  margin-bottom: 8px;
+}
+
+.row:last-child { margin-bottom: 0; }
+
+.row label {
+  font-size: 13px;
+  color: #444;
+}
+
+.row input[type="number"] {
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 6px;
+  font: inherit;
+  font-size: 13px;
 }
 
 #api-key {
