@@ -26,6 +26,11 @@ const chromeMock = {
   action: {
     setBadgeText: async () => {},
     setBadgeBackgroundColor: async () => {},
+    setTitle: async () => {},
+  },
+  alarms: {
+    onAlarm: { addListener: () => {} },
+    create: () => {},
   },
 };
 

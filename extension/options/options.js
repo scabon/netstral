@@ -9,6 +9,83 @@ const budgetInput = document.getElementById("budget");
 const warnPctInput = document.getElementById("warn-pct");
 const dangerPctInput = document.getElementById("danger-pct");
 const usageNowEl = document.getElementById("usage-now");
+const btnBudget = document.getElementById("btn-budget");
+const budgetStatusEl = document.getElementById("budget-status");
+const budgetViewEl = document.getElementById("budget-view");
+const budgetDebugEl = document.getElementById("budget-debug");
+
+const fmtEUR = (n, cur = "EUR") =>
+  `${n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${cur}`;
+
+function renderBudgetView() {
+  chrome.storage.local
+    .get(["accountBudget", "accountBudgetError"])
+    .then(({ accountBudget, accountBudgetError }) => {
+      if (
+        accountBudget &&
+        typeof accountBudget.usage_percentage === "number"
+      ) {
+        const b = accountBudget;
+        const pct = Math.min(100, Math.round(b.usage_percentage));
+        let line = `Consommation du compte : <strong>${pct}%</strong>`;
+        if (b.initial_budget != null) {
+          const used = (b.usage_percentage / 100) * b.initial_budget;
+          line += ` — ${fmtEUR(used, b.currency)} sur ${fmtEUR(b.initial_budget, b.currency)}`;
+        }
+        if (b.reset_at) {
+          const d = new Date(b.reset_at);
+          if (!Number.isNaN(d.getTime())) {
+            line += ` (réinitialisé le ${d.toLocaleDateString("fr-FR")})`;
+          }
+        }
+        const age = Math.round((Date.now() - b.fetchedAt) / 60000);
+        line += ` — lu il y a ${age} min`;
+        budgetViewEl.innerHTML = line;
+        if (accountBudgetError) {
+          budgetDebugEl.textContent = `Dernier refresh partiel : ${accountBudgetError}`;
+          budgetDebugEl.classList.remove("hidden");
+        }
+        if (b.rawNumeric && Object.keys(b.rawNumeric).length) {
+          budgetDebugEl.textContent =
+            (accountBudgetError ? budgetDebugEl.textContent + " — " : "") +
+            "Champs reçus : " +
+            Object.entries(b.rawNumeric)
+              .map(([k, v]) => `${k}=${v}`)
+              .join(", ");
+          budgetDebugEl.classList.remove("hidden");
+        }
+        budgetStatusEl.textContent = "";
+        budgetStatusEl.className = "";
+      } else {
+        budgetViewEl.innerHTML =
+          "Pas encore de lecture. Connectez-vous à console.mistral.ai puis « Actualiser ».";
+        if (accountBudgetError) {
+          budgetStatusEl.textContent = accountBudgetError;
+          budgetStatusEl.className = "err";
+        }
+      }
+    });
+}
+
+btnBudget.addEventListener("click", () => {
+  budgetStatusEl.textContent = "Lecture en cours…";
+  chrome.runtime.sendMessage({ type: "refreshBudget" }, (res) => {
+    if (chrome.runtime.lastError) {
+      budgetStatusEl.textContent = chrome.runtime.lastError.message;
+      budgetStatusEl.className = "err";
+      return;
+    }
+    if (res?.accountBudgetError && !res?.accountBudget) {
+      budgetStatusEl.textContent = res.accountBudgetError;
+      budgetStatusEl.className = "err";
+    } else {
+      budgetStatusEl.textContent = "OK";
+      budgetStatusEl.className = "ok";
+    }
+    renderBudgetView();
+  });
+});
+renderBudgetView();
 
 const DEFAULT_SETTINGS = {
   monthlyBudgetTokens: null,
@@ -86,6 +163,7 @@ loadBadgeSettings();
 // Le compteur d'usage bouge après un tour de chat : on se met à jour.
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && changes.usage) loadBadgeSettings();
+  if (area === "local" && changes.accountBudget) renderBudgetView();
 });
 
 // Sauvegarde la clé dès qu'elle change (débouncée).

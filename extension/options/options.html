@@ -39,11 +39,31 @@
     </section>
 
     <section>
-      <h2>Budget mensuel &amp; badge</h2>
+      <h2>Usage réel du compte (badge)</h2>
       <p>
-        Le badge de l'icône affiche le pourcentage des tokens API consommés
-        ce mois-ci par rapport au budget ci-dessous (comptage local, par
-        mois calendaire).
+        Affiché en priorité sur le badge : la consommation réelle du compte
+        Mistral (tous canaux — API, Studio, Webstral…), lue depuis votre
+        session Mistral dans ce navigateur (connectez-vous sur
+        <a href="https://console.mistral.ai/" target="_blank" rel="noreferrer">console.mistral.ai</a>).
+        Aucun mot de passe n'est demandé : l'extension lit le cookie de
+        session existant.
+      </p>
+      <div class="row">
+        <button id="btn-budget">Actualiser depuis la session Mistral</button>
+        <span id="budget-status"></span>
+      </div>
+      <p id="budget-view" class="budget-view"></p>
+      <p id="budget-debug" class="note hidden"></p>
+    </section>
+
+    <section>
+      <h2>Comptage local (repli sans session)</h2>
+      <p>
+        Sans session Mistral valide, le badge utilise ce comptage : uniquement
+        les tokens passés par Webstral, par mois calendaire.
+      </p>
+      <p>
+        Budget mensuel de tokens utilisé pour ce repli :
       </p>
       <div class="row">
         <label for="budget">Budget mensuel (tokens)</label>
@@ -61,8 +81,8 @@
     <section>
       <h2>À venir</h2>
       <p class="note">
-        Badge de consommation de tokens sur l'icône, clé Admin Mistral pour le
-        quota réel, « Ask Webstral » sur sélection de texte, version Firefox.
+        « Ask Webstral » sur sélection de texte, version Firefox,
+        Admin API (Enterprise) pour un usage facturé hors session.
       </p>
     </section>
   </main>
