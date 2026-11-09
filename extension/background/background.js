@@ -134,14 +134,79 @@ async function fetchConsoleCredits() {
       total != null && total > 0 && ongoing != null
         ? (ongoing / total) * 100
         : null,
-    rawNumeric: Object.fromEntries(
-      Object.entries(data).filter(([, v]) => typeof v === "number")
-    ),
+    rawNumeric: flattenNumeric(data),
+    rawPreview: safePreview(data),
   };
   await chrome.storage.local.set({ consoleCredits: record });
   return { ok: true, consoleCredits: record };
 }
 
+// Aplati un objet JSON en "chemin.pointé=valeur" pour les nombres (profondeur 4).
+function flattenNumeric(obj, prefix = "", depth = 0, out = {}) {
+  if (depth > 4 || !obj || typeof obj !== "object") return out;
+  for (const [k, v] of Object.entries(obj)) {
+    const path = prefix ? `${prefix}.${k}` : k;
+    if (typeof v === "number") out[path] = v;
+    else if (v && typeof v === "object" && !Array.isArray(v))
+      flattenNumeric(v, path, depth + 1, out);
+  }
+  return out;
+}
+
+// Aperçu JSON tronqué, sans jamais contenir de secret (endpoints billing :
+// chiffres et dates uniquement).
+function safePreview(data) {
+  try {
+    return JSON.stringify(data).slice(0, 600);
+  } catch {
+    return "";
+  }
+}
+
+// ---------- Diagnostic console ----------
+// Sonne les endpoints candidats avec la session : statut + aperçu du corps.
+// Sert à cartographier la vraie API console (non documentée) en un clic.
+
+async function fetchSessionText(url) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 10000);
+  let response;
+  try {
+    response = await fetch(url, {
+      credentials: "include",
+      signal: ctrl.signal,
+    });
+  } catch (err) {
+    return { status: 0, error: `Réseau : ${err.message}` };
+  } finally {
+    clearTimeout(timer);
+  }
+  let text = "";
+  try {
+    text = (await response.text()).slice(0, 700);
+  } catch {
+    text = "<corps illisible>";
+  }
+  return {
+    status: response.status,
+    redirected: response.redirected ? response.url : null,
+    text,
+  };
+}
+
+function consoleProbeUrls() {
+  const now = new Date();
+  const start = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  const end = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  return [
+    "https://console.mistral.ai/api/billing/credits",
+    `https://console.mistral.ai/api/billing/usage?start_date=${start}&end_date=${end}`,
+    `https://console.mistral.ai/api/billing/usage/monthly?start_date=${start}&end_date=${end}`,
+    "https://console.mistral.ai/api/billing/subscription",
+    "https://console.mistral.ai/api/billing/payg",
+    "https://console.mistral.ai/api/vibe/account-context",
+  ];
+}
 // Allocation de l'abonnement (Vibe Pro) — secondaire.
 async function fetchAccountBudget() {
   const res = await fetchJsonWithSession(BUDGET_URL);
@@ -160,9 +225,8 @@ async function fetchAccountBudget() {
     initial_budget: data.initial_budget ?? null,
     currency: data.currency ?? "EUR",
     reset_at: data.reset_at ?? null,
-    rawNumeric: Object.fromEntries(
-      Object.entries(data).filter(([, v]) => typeof v === "number")
-    ),
+    rawNumeric: flattenNumeric(data),
+    rawPreview: safePreview(data),
   };
   await chrome.storage.local.set({ accountBudget: record });
   return { ok: true, accountBudget: record };
@@ -418,6 +482,18 @@ chrome.runtime.onConnect.addListener((port) => {
 // ---------- Messages simples (options page) ----------
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg.type === "probeConsole") {
+    (async () => {
+      const results = [];
+      for (const url of consoleProbeUrls()) {
+        const r = await fetchSessionText(url);
+        results.push(r);
+      }
+      sendResponse({ probes: results });
+    })();
+    return true; // réponse asynchrone
+  }
+
   if (msg.type === "refreshBudget") {
     refreshBudgetAndBadge()
       .then(() =>

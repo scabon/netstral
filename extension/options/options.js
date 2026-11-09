@@ -52,6 +52,14 @@ function renderBudgetView() {
               .map(([k, v]) => `${k}=${v}`)
               .join(", ")
         );
+      } else if (st.consoleCredits) {
+        // lu, mais sans les champs attendus -> montre le corps brut
+        lines.push(
+          `<strong>${BUDGET_LABELS["console-credits"]} :</strong> lu, mais champs non reconnus — voir diagnostic`
+        );
+        debug.push(
+          "aperçu credits : " + (st.consoleCredits.rawPreview || "(vide)")
+        );
       } else if (st.consoleCreditsError) {
         lines.push(
           `<strong>${BUDGET_LABELS["console-credits"]} :</strong> ${st.consoleCreditsError}`
@@ -108,6 +116,29 @@ function renderBudgetView() {
       budgetStatusEl.className = badgeSource ? "ok" : "";
     });
 }
+
+const btnProbe = document.getElementById("btn-probe");
+const probeViewEl = document.getElementById("probe-view");
+
+btnProbe.addEventListener("click", () => {
+  probeViewEl.classList.remove("hidden");
+  probeViewEl.textContent = "Sondage en cours…";
+  chrome.runtime.sendMessage({ type: "probeConsole" }, (res) => {
+    if (chrome.runtime.lastError) {
+      probeViewEl.textContent = chrome.runtime.lastError.message;
+      return;
+    }
+    const lines = [];
+    for (const p of res?.probes ?? []) {
+      const status = p.error ? p.error : `HTTP ${p.status}`;
+      const redir = p.redirected ? ` -> ${p.redirected}` : "";
+      lines.push(`[${status}]${redir}`);
+      if (p.text) lines.push(p.text.replace(/\s+/g, " ").slice(0, 250));
+      lines.push("");
+    }
+    probeViewEl.textContent = lines.join("\n") || "Aucune réponse.";
+  });
+});
 
 btnBudget.addEventListener("click", () => {
   budgetStatusEl.textContent = "Lecture en cours…";

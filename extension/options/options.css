@@ -121,4 +121,18 @@ button:hover {
   margin: 10px 0 0;
 }
 
+.probe-view {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  color: #444;
+  white-space: pre-wrap;
+  background: #f4f4f7;
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+  padding: 8px;
+  margin: 8px 0 0;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
 .hidden { display: none; }
