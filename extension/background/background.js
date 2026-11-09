@@ -219,17 +219,16 @@ function extractApiPaths(text) {
   const re = /["'`](\/(?:api|trpc|local-trpc)\/[A-Za-z0-9\-_/.{}$]{2,120})["'`]/g;
   let m;
   while ((m = re.exec(text)) !== null) found.add(m[1]);
+  // les procédures tRPC sont souvent citées sans le préfixe (billing.info,
+  // billing.subscriptions.current...) : capture aussi ce motif.
+  const tre = /["'`](billing\.[A-Za-z0-9\-.]{2,60})["'`]/g;
+  while ((m = tre.exec(text)) !== null) found.add(`local-trpc:${m[1]}`);
   return [...found];
 }
 
-// Scan du frontend console avec la session : récupère les bundles JS
-// chargés par les pages candidats et en extrait les chemins d'API.
-async function scanConsoleFrontend() {
-  const routes = [
-    "https://console.mistral.ai/",
-    "https://console.mistral.ai/usage",
-    "https://console.mistral.ai/billing",
-  ];
+// Scan d'un frontend avec la session : récupère les pages, en extrait les
+// bundles JS et collecte tous les chemins d'API qu'ils citent.
+async function scanFrontendPages(routes) {
   const scriptUrls = new Set();
   const apiPaths = new Set();
   for (const route of routes) {
@@ -238,19 +237,36 @@ async function scanConsoleFrontend() {
     const srcRe = /<script[^>]+src="([^"]+)"/g;
     let m;
     while ((m = srcRe.exec(page.text)) !== null) {
-      const src = m[1];
-      if (src.startsWith("http")) scriptUrls.add(src);
-      else if (src.startsWith("/")) scriptUrls.add(`https://console.mistral.ai${src}`);
+      let src = m[1];
+      if (!src.startsWith("http")) {
+        const origin = new URL(route).origin;
+        src = src.startsWith("/") ? origin + src : route + "/" + src;
+      }
+      if (src.endsWith(".js")) scriptUrls.add(src);
     }
     for (const p of extractApiPaths(page.text)) apiPaths.add(p);
   }
-  // plafonne le nombre de bundles analysés (taille réseau)
-  const bundles = [...scriptUrls].filter((u) => u.endsWith(".js")).slice(0, 12);
+  const bundles = [...scriptUrls].slice(0, 15);
   for (const url of bundles) {
-    const js = await fetchSessionText(url, 300000);
+    const js = await fetchSessionText(url, null); // bundles analysés en entier
     for (const p of extractApiPaths(js.text)) apiPaths.add(p);
   }
   return { routes: routes.length, bundles: bundles.length, apiPaths: [...apiPaths].sort() };
+}
+
+// Sonde les procédures local-trpc découvertes avec l'input null que l'app
+// admin utilise, et renvoie statut + aperçu.
+async function probeLocalTrpcProcedures(procedures, origin) {
+  const nullInput = encodeURIComponent(
+    '{"json":null,"meta":{"values":["undefined"],"v":1}}'
+  );
+  const out = [];
+  for (const proc of procedures.slice(0, 15)) {
+    const url = `${origin}/api/local-trpc/${proc}?input=${nullInput}`;
+    const r = await fetchSessionText(url, 500);
+    out.push({ proc, status: r.status, redirected: r.redirected, text: r.text });
+  }
+  return out;
 }
 // Allocation de l'abonnement (Vibe Pro) — secondaire.
 async function fetchAccountBudget() {
@@ -529,17 +545,42 @@ chrome.runtime.onConnect.addListener((port) => {
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === "probeConsole") {
     (async () => {
+      // 1. endpoints console candidats (session cookie)
       const results = [];
       for (const url of consoleProbeUrls()) {
         results.push(await fetchSessionText(url));
       }
-      let scan = null;
+
+      // 2. scan du frontend ADMIN (/subscription héberge le « X sur Y »)
+      let adminScan = null;
+      let adminProbes = [];
       try {
-        scan = await scanConsoleFrontend();
+        adminScan = await scanFrontendPages([
+          "https://admin.mistral.ai/subscription",
+          "https://admin.mistral.ai/",
+        ]);
+        const procs = adminScan.apiPaths
+          .filter((p) => p.startsWith("local-trpc:"))
+          .map((p) => p.slice("local-trpc:".length));
+        adminScan.procedures = procs;
+        adminProbes = await probeLocalTrpcProcedures(procs, "https://admin.mistral.ai");
       } catch (err) {
-        scan = { error: String(err) };
+        adminScan = { error: String(err) };
       }
-      sendResponse({ probes: results, scan });
+
+      // 3. scan du frontend console (pour la route du chat / clés)
+      let consoleScan = null;
+      try {
+        consoleScan = await scanFrontendPages([
+          "https://console.mistral.ai/",
+          "https://console.mistral.ai/usage",
+          "https://console.mistral.ai/billing",
+        ]);
+      } catch (err) {
+        consoleScan = { error: String(err) };
+      }
+
+      sendResponse({ probes: results, adminScan, adminProbes, consoleScan });
     })();
     return true; // réponse asynchrone
   }

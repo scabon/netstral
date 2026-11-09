@@ -136,12 +136,29 @@ btnProbe.addEventListener("click", () => {
       if (p.text) lines.push(p.text.replace(/\s+/g, " ").slice(0, 250));
       lines.push("");
     }
-    const scan = res?.scan;
+    const scan = res?.adminScan;
     if (scan) {
       lines.push(
-        `--- scan frontend : ${scan.bundles ?? "?"} bundles analysés, ${scan.apiPaths?.length ?? 0} chemins d'API trouvés ---`
+        `--- admin.mistral.ai : ${scan.bundles ?? "?"} bundles, ${scan.procedures?.length ?? scan.apiPaths?.length ?? 0} procédures tRPC ---`
       );
       for (const p of scan.apiPaths ?? []) lines.push(p);
+      lines.push("");
+    }
+    if (res?.adminProbes?.length) {
+      lines.push("--- sondage local-trpc (input null) ---");
+      for (const p of res.adminProbes) {
+        const redir = p.redirected ? ` -> ${p.redirected}` : "";
+        lines.push(`[${p.proc}] HTTP ${p.status}${redir}`);
+        if (p.text) lines.push(p.text.replace(/\s+/g, " ").slice(0, 300));
+        lines.push("");
+      }
+    }
+    const cscan = res?.consoleScan;
+    if (cscan) {
+      lines.push(
+        `--- console.mistral.ai : ${cscan.bundles ?? "?"} bundles, ${cscan.apiPaths?.length ?? 0} chemins ---`
+      );
+      for (const p of (cscan.apiPaths ?? []).slice(0, 40)) lines.push(p);
     }
     probeViewEl.textContent = lines.join("\n") || "Aucune réponse.";
   });
