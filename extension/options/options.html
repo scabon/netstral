@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Webstral — Paramètres</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <main>
+    <h1>Webstral</h1>
+    <p class="lead">
+      Webstral appelle directement l'API Mistral depuis votre navigateur
+      (BYOK — Bring Your Own Key). Aucune donnée ne transite ailleurs.
+    </p>
+
+    <section>
+      <h2>Clé API Mistral</h2>
+      <p>
+        Créez une clé sur
+        <a href="https://console.mistral.ai/api-keys" target="_blank" rel="noreferrer">console.mistral.ai</a>
+        (La Plateforme). Elle reste stockée localement dans l'extension.
+      </p>
+      <div class="row">
+        <input type="password" id="api-key" placeholder="Ex. …" autocomplete="off" spellcheck="false">
+        <button id="btn-toggle" title="Afficher/masquer">&#128065;</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>Connexion &amp; modèles</h2>
+      <div class="row">
+        <button id="btn-test">Tester la connexion et charger les modèles</button>
+        <span id="status"></span>
+      </div>
+      <ul id="model-list" class="model-list hidden"></ul>
+      <p class="note">
+        Le modèle par défaut se choisit dans le bandeau du side panel.
+      </p>
+    </section>
+
+    <section>
+      <h2>À venir</h2>
+      <p class="note">
+        Badge de consommation de tokens sur l'icône, clé Admin Mistral pour le
+        quota réel, « Ask Webstral » sur sélection de texte, version Firefox.
+      </p>
+    </section>
+  </main>
+  <script type="module" src="options.js"></script>
+</body>
+</html>
