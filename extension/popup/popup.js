@@ -150,7 +150,7 @@ function render(state) {
     }
     consoSourceEl.textContent =
       b.mode === "account" && b.fetchedAt
-        ? t("source_lu", { source: b.source ?? t(b.labelKey ?? "badge_local"), ago: ilYA(b.fetchedAt) })
+        ? t("read_ago", { ago: ilYA(b.fetchedAt) })
         : b.mode === "local"
           ? t("conso_local_fallback")
           : "";
@@ -262,10 +262,14 @@ btnChat.addEventListener("click", async () => {
 });
 
 btnRefresh.addEventListener("click", async () => {
-  menuEl.classList.add("hidden");
+  btnRefresh.classList.add("spin");
   consoSourceEl.textContent = t("refresh_in_progress");
-  await chrome.runtime.sendMessage({ type: "refreshBudget" });
-  await load();
+  try {
+    await chrome.runtime.sendMessage({ type: "refreshBudget" });
+  } finally {
+    await load();
+    btnRefresh.classList.remove("spin");
+  }
 });
 
 // Liens rapides console/admin : de simples ancres <a target="_blank"> en bas

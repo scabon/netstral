@@ -13,7 +13,6 @@
     <button id="btn-menu" title="Menu">&#8942;</button>
     <nav id="menu" class="menu hidden">
       <button id="btn-chat" data-i18n="menu_openChat">Ouvrir le chat</button>
-      <button id="btn-refresh" data-i18n="menu_refresh">Actualiser la conso</button>
       <hr>
       <button id="btn-options" data-i18n="menu_options">Paramètres</button>
       <button id="btn-changelog" data-i18n="menu_changelog">Changelog</button>
@@ -29,7 +28,10 @@
       </div>
       <div class="bar"><div id="bar-fill" class="fill"></div></div>
       <div id="conso-detail" class="detail"></div>
-      <div id="conso-source" class="note"></div>
+      <div class="conso-foot">
+        <span id="conso-source" class="note"></span>
+        <button id="btn-refresh" class="icon-btn" data-i18n-title="menu_refresh" title="Actualiser la conso">&#8635;</button>
+      </div>
 
       <div class="sep"></div>
 

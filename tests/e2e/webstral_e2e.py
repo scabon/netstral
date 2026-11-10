@@ -263,6 +263,10 @@ POPUP_MOCK = """
             document.body.dataset.openChat = "1";
             return Promise.resolve({ ok: true });
           }
+          if (m.type === "refreshBudget") {
+            document.body.dataset.refreshBudget = "1";
+            return Promise.resolve({});
+          }
           return Promise.resolve({});
         },
         openOptionsPage: () => { document.body.dataset.optionsOpened = "1"; },
@@ -675,6 +679,9 @@ def main() -> int:
 
         menu = client.execute_script(
             """
+            const rb = document.getElementById('btn-refresh');
+            const sourceAvant = document.getElementById('conso-source').textContent;
+            if (rb) rb.click();
             document.getElementById('btn-menu').click();
             const menu = document.getElementById('menu');
             const visible = menu && !menu.classList.contains('hidden');
@@ -683,6 +690,9 @@ def main() -> int:
             document.getElementById('btn-options').click();
             return {
               visible,
+              refreshPresent: !!rb,
+              refreshCalled: document.body.dataset.refreshBudget || '',
+              sourceAvant,
               openChat: document.body.dataset.openChat || '',
               tabsCreate: document.body.dataset.tabsCreate || '',
               optionsOpened: document.body.dataset.optionsOpened || '',
@@ -691,16 +701,21 @@ def main() -> int:
             };
             """
         )
+        time.sleep(0.5)
         check(
-            "C3: menu pop-up (chat/about/options) + liens console/admin en bas",
+            "C3: menu pop-up + bouton refresh (hors menu) + 'lu il y a…' + liens en bas",
             menu
             and menu["visible"]
+            and menu["refreshPresent"] is True
+            and menu["refreshCalled"] == "1"
+            and "lu il y a" in menu["sourceAvant"]
+            and "Source" not in menu["sourceAvant"]
             and menu["openChat"] == "1"
             and "pages/about.html" in menu["tabsCreate"]
             and menu["optionsOpened"] == "1"
             and "console.mistral.ai" in menu["linkConsole"]
             and "admin.mistral.ai/subscription" in menu["linkSub"],
-            json.dumps(menu, ensure_ascii=False)[:240],
+            json.dumps(menu, ensure_ascii=False)[:260],
         )
 
         return 0 if all(ok for _, ok in checks) else 1

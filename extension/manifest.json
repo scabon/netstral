@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Webstral",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Discutez avec les modèles Mistral depuis n'importe quel onglet, avec suivi de consommation de tokens.",
   "minimum_chrome_version": "116",
   "browser_specific_settings": {
