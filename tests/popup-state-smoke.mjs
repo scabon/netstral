@@ -52,6 +52,17 @@ globalThis.fetch = async (url) => {
   if (u.includes("local-trpc/billing.subscriptions.current")) {
     if (mode === "none") return { ok: false, status: 401, redirected: false, url: u };
     if (mode === "enterprise") return { ok: false, status: 401, redirected: false, url: u };
+    if (mode === "free") {
+      return {
+        ok: true,
+        status: 200,
+        redirected: false,
+        url: u,
+        json: async () => ({
+          result: { data: { json: { subscription: { plan: "Free" } } } },
+        }),
+      };
+    }
     return {
       ok: true,
       status: 200,
@@ -167,6 +178,14 @@ results.push(
     if (st.account?.subscriptionPlan?.plan !== "enterprise")
       p.push(`plan=${JSON.stringify(st.account?.subscriptionPlan)}`);
     if (st.badge?.label !== "plan Vibe") p.push(`label=${st.badge?.label}`);
+    return p;
+  })
+);
+results.push(
+  await scenario("plan Free reconnu (chaîne aplatie)", "free", (st) => {
+    const p = [];
+    if (st.account?.subscriptionPlan?.plan !== "free")
+      p.push(`plan=${JSON.stringify(st.account?.subscriptionPlan)}`);
     return p;
   })
 );

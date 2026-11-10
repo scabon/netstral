@@ -342,18 +342,23 @@ function flattenStrings(obj, prefix = "", depth = 0, out = {}) {
 }
 
 const PLAN_PATTERNS = [
+  [/(enterprise|entreprise)/i, "enterprise"],
   [/^(free|gratuit)$/i, "free"],
   [/^pro$/i, "pro"],
-  [/(enterprise|entreprise)/i, "enterprise"],
+  [/^(basic|starter)$/i, "basic"],
   [/^(team|équipe)$/i, "team"],
   [/^scale$/i, "scale"],
   [/(trial|essai)/i, "trial"],
+  [/(payg|pay[- ]as[- ]you[- ]go)/i, "payg"],
 ];
 
 // Cherche un nom de plan dans les chaînes aplaties : d'abord les chemins
-// explicites (plan/tier/subscription/…), puis toutes les autres.
+// explicites (plan/tier/subscription/…), puis toutes les autres. Les
+// valeurs d'email/URL sont ignorées (faux positifs).
 function classifyPlan(strings) {
-  const entries = Object.entries(strings);
+  const entries = Object.entries(strings).filter(
+    ([, v]) => !v.includes("@") && !v.includes("/")
+  );
   const explicit = entries.filter(([p]) =>
     /(plan|tier|subscription|level|package|name)/i.test(p)
   );

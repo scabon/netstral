@@ -37,9 +37,12 @@ const PLAN_LABELS = {
 const fmtEUR = (n, cur = "EUR") =>
   `${n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${cur}`;
 const fmtTokens = (n) => n.toLocaleString("fr-FR");
+// Format compact yyyy-MM-dd, composantes UTC (les reset Mistral sont à 00:00:00Z).
 const fmtDate = (iso) => {
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString("fr-FR");
+  if (Number.isNaN(d.getTime())) return iso;
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}`;
 };
 const ilYA = (ts) => {
   const min = Math.max(0, Math.round((Date.now() - ts) / 60000));
@@ -86,6 +89,10 @@ function render(state) {
   }
 
   // --- Compte ---
+  // Le comptage local n'a d'intérêt que sans source compte : masqué dès
+  // que la conso du compte Mistral est disponible (même % que le badge).
+  document.querySelector("section.local").classList.toggle("hidden", b?.mode === "account");
+
   const acc = state.account ?? {};
   const plan = acc.subscriptionPlan;
   if (plan?.plan) {
@@ -109,7 +116,13 @@ function render(state) {
   accResetEl.textContent = b?.resetAt ? fmtDate(b.resetAt) : "—";
   accKeyEl.textContent = state.hasApiKey ? "configurée" : "non configurée";
 
-  const err = acc.consoleCreditsError ?? acc.accountBudgetError ?? acc.subscriptionPlanError;
+  // Erreur de session affichée seulement si AUCUNE source compte n'est
+  // disponible : une sonde du plan qui échoue (HTTP 404…) ne doit pas
+  // afficher « connectez-vous » quand le budget du compte est bien lu.
+  const hasAccountSource = b?.mode === "account";
+  const err = hasAccountSource
+    ? null
+    : acc.consoleCreditsError ?? acc.accountBudgetError ?? acc.subscriptionPlanError ?? null;
   if (err) {
     accErrorEl.innerHTML = "";
     accErrorEl.append(

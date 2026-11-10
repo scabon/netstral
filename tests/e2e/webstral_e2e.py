@@ -49,7 +49,9 @@ checks = []
 
 def check(name, ok, extra=""):
     checks.append((name, bool(ok)))
-    print(("PASS " if ok else "FAIL ") + name + (f" — {extra}" if extra else ""))
+    # console Windows en cp1252 : on remplace les caractères non encodables
+    clean = lambda s: s.encode("cp1252", "replace").decode("cp1252")
+    print(("PASS " if ok else "FAIL ") + clean(str(name)) + (f" — {clean(str(extra))}" if extra else ""))
 
 
 def wait_port_open(port, tries=30):
@@ -211,6 +213,13 @@ POPUP_MOCK = """
       hasApiKey: true,
       modelCount: 3,
     };
+    // #local : bascule le badge en comptage local (pour tester l'affichage repli)
+    if (location.hash === "#local") {
+      state.badge = {
+        mode: "local", label: "comptage local", pct: 15, color: "#1a7f37",
+        spentTokens: 150, budgetTokens: 1000,
+      };
+    }
     window.chrome = {
       storage: {
         local: { get: async () => ({}), set: async () => {} },
@@ -452,13 +461,15 @@ def main() -> int:
               detail: document.getElementById('conso-detail').textContent,
               plan: document.getElementById('acc-plan').textContent,
               wallet: document.getElementById('acc-wallet').textContent,
+              reset: document.getElementById('acc-reset').textContent,
               key: document.getElementById('acc-key').textContent,
-              tokens: document.getElementById('local-tokens').textContent,
+              errHidden: document.getElementById('acc-error').classList.contains('hidden'),
+              localHidden: document.querySelector('section.local').classList.contains('hidden'),
             };
             """
         )
         check(
-            "C3: pop-up rend conso (21%) + compte (Pro) + local (15 tokens)",
+            "C3: pop-up rend conso (21%) + compte (Pro) ; local masqué, pas d'erreur rouge",
             pop
             and pop["version"] == "v0.3.0-test"
             and pop["pct"].replace(" ", "").replace("\u202f", "").replace("\u00a0", "") == "21%"
@@ -466,9 +477,38 @@ def main() -> int:
             and "26" in pop["bg"]  # rgb(26, 127, 55) = #1a7f37
             and "255" in pop["detail"]
             and pop["plan"] == "Pro"
+            and pop["reset"] == "2026-12-01"  # yyyy-MM-dd
             and pop["key"] == "configurée"
-            and pop["tokens"].replace(" ", "").replace("\u202f", "").replace("\u00a0", "") == "15",
+            and pop["errHidden"] is True   # source compte OK -> pas d'erreur de session
+            and pop["localHidden"] is True,  # comptage local masqué avec source compte
             json.dumps(pop, ensure_ascii=False)[:200],
+        )
+
+        # C3b : repli comptage local (#local) -> section local visible.
+        # (détour par une autre page : même URL + hash ne rechargerait pas)
+        client.navigate(f"http://127.0.0.1:{HTTP_PORT}/options/options.html")
+        time.sleep(0.4)
+        client.navigate(f"http://127.0.0.1:{HTTP_PORT}/popup/popup.html#local")
+        time.sleep(0.8)
+        pop_local = client.execute_script(
+            """
+            return {
+              pct: document.getElementById('conso-pct').textContent,
+              detail: document.getElementById('conso-detail').textContent,
+              localHidden: document.querySelector('section.local').classList.contains('hidden'),
+              tokens: document.getElementById('local-tokens').textContent,
+            };
+            """
+        )
+        norm = lambda s: (s or "").replace(" ", "").replace("\u202f", "").replace("\u00a0", "")
+        check(
+            "C3b: repli local -> 15%, 150/1000 tokens, section local visible",
+            pop_local
+            and norm(pop_local["pct"]) == "15%"
+            and "150" in pop_local["detail"] and "1000" in norm(pop_local["detail"])
+            and pop_local["localHidden"] is False
+            and norm(pop_local["tokens"]) == "15",
+            json.dumps(pop_local, ensure_ascii=False)[:200],
         )
         menu = client.execute_script(
             """

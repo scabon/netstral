@@ -17,6 +17,14 @@ const budgetDebugEl = document.getElementById("budget-debug");
 const fmtEUR = (n, cur = "EUR") =>
   `${n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${cur}`;
 
+// yyyy-MM-dd en UTC (les reset Mistral sont à 00:00:00Z).
+const fmtDateUTC = (iso) => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}`;
+};
+
 const BUDGET_LABELS = {
   "console-credits": "Crédits console (wallet PAYG)",
   "admin-budget": "Abonnement Mistral",
@@ -29,6 +37,8 @@ function renderBudgetView() {
       "consoleCreditsError",
       "accountBudget",
       "accountBudgetError",
+      "subscriptionPlan",
+      "subscriptionPlanError",
     ])
     .then((st) => {
       const lines = [];
@@ -95,9 +105,7 @@ function renderBudgetView() {
               : "";
           let extra = "";
           if (sub.reset_at) {
-            const d = new Date(sub.reset_at);
-            if (!Number.isNaN(d.getTime()))
-              extra = ` (réinitialisé le ${d.toLocaleDateString("fr-FR")})`;
+            extra = ` (réinitialisé le ${fmtDateUTC(sub.reset_at)})`;
           }
           return `<strong>${label} :</strong> ${pct}%${part}${extra}`;
         };
@@ -110,6 +118,25 @@ function renderBudgetView() {
         debug.push("champs admin : " + (a.rawPreview || "(vide)"));
       } else if (st.accountBudgetError) {
         lines.push(`<strong>Abonnement :</strong> ${st.accountBudgetError}`);
+      }
+
+      // Type de plan (gratuit / pro / entreprise) — sonde subscriptions.*
+      if (st.subscriptionPlan) {
+        const sp = st.subscriptionPlan;
+        const age = Math.round((Date.now() - sp.fetchedAt) / 60000);
+        lines.push(
+          sp.plan
+            ? `<strong>Type de plan :</strong> ${sp.plan} (${sp.planRaw}, ${sp.planPath}, lu il y a ${age} min)`
+            : `<strong>Type de plan :</strong> non reconnu — brut ci-dessous (lu il y a ${age} min)`
+        );
+        debug.push("plan source : " + sp.source);
+        debug.push("plan brut : " + (sp.rawPreview || "(vide)"));
+        const rs = Object.entries(sp.rawStrings ?? {})
+          .map(([k, v]) => `${k}=${v}`)
+          .join(", ");
+        if (rs) debug.push("chaînes : " + rs.slice(0, 600));
+      } else if (st.subscriptionPlanError) {
+        lines.push(`<strong>Type de plan :</strong> ${st.subscriptionPlanError}`);
       }
 
       budgetViewEl.innerHTML = lines.join("<br>");
@@ -318,7 +345,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && changes.usage) loadBadgeSettings();
   if (
     area === "local" &&
-    (changes.accountBudget || changes.consoleCredits)
+    (changes.accountBudget ||
+      changes.consoleCredits ||
+      changes.subscriptionPlan)
   )
     renderBudgetView();
 });
