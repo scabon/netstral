@@ -18,6 +18,10 @@ const keyRowEl = $("key-row");
 const btnConfigKey = $("btn-config-key");
 const accErrorEl = $("acc-error");
 const localTokensEl = $("local-tokens");
+const projEl = $("projection");
+const projRateEl = $("proj-rate");
+const projEndEl = $("proj-end");
+const proj100El = $("proj-100");
 
 const btnMenu = $("btn-menu");
 const menuEl = $("menu");
@@ -54,6 +58,55 @@ const ilYA = (ts) => {
   return `il y a ${h} h`;
 };
 
+const DAY_MS = 86400000;
+
+// Projection à partir du % actuel et de la date de réinitialisation :
+// rythme (%/jour), % estimé en fin de période (peut dépasser 100 %),
+// jours restants avant 100 % à ce rythme. Sans resetAt connu, on prend le
+// mois calendaire UTC comme période.
+function computeProjection(b) {
+  if (b?.pct == null) return null;
+  let resetTs = b.resetAt ? Date.parse(b.resetAt) : NaN;
+  let periodDays, daysLeft;
+  if (!Number.isNaN(resetTs)) {
+    const prev = new Date(resetTs);
+    prev.setUTCMonth(prev.getUTCMonth() - 1);
+    periodDays = Math.round((resetTs - prev.getTime()) / DAY_MS);
+    daysLeft = Math.max(0, Math.ceil((resetTs - Date.now()) / DAY_MS));
+  } else {
+    const now = new Date();
+    const start = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
+    const end = Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1);
+    periodDays = Math.round((end - start) / DAY_MS);
+    daysLeft = Math.max(0, Math.ceil((end - now.getTime()) / DAY_MS));
+  }
+  const daysElapsed = Math.max(1, periodDays - daysLeft);
+  const rate = b.pct / daysElapsed; // % par jour
+  const endPct = rate * periodDays;
+  const daysTo100 = b.pct > 0 ? (100 - b.pct) / rate : Infinity;
+  return { rate, endPct, daysTo100, daysLeft, periodDays };
+}
+
+function renderProjection(b) {
+  const p = computeProjection(b);
+  if (!p) {
+    projEl.classList.add("hidden");
+    return;
+  }
+  projEl.classList.remove("hidden");
+  projRateEl.textContent = `Rythme actuel : ${p.rate.toFixed(1)} %/jour (${p.periodDays - p.daysLeft} j écoulés sur ${p.periodDays})`;
+  projEndEl.textContent = `Fin de période (dans ${p.daysLeft} j) : ~${Math.round(p.endPct)} % du budget`;
+  if (Number.isFinite(p.daysTo100)) {
+    const j = Math.round(p.daysTo100);
+    proj100El.textContent =
+      p.daysTo100 <= p.daysLeft
+        ? `À ce rythme, 100 % atteints dans ~${j} j (avant la réinitialisation)`
+        : `À ce rythme, 100 % atteints dans ~${j} j (après la réinitialisation)`;
+  } else {
+    proj100El.textContent = "Aucune conso pour l'instant — 100 % hors de portée à ce rythme.";
+  }
+}
+
 function render(state) {
   versionEl.textContent = state.ok ? `v${state.version}` : "";
 
@@ -89,6 +142,7 @@ function render(state) {
     consoSourceEl.textContent =
       "Connectez-vous sur console.mistral.ai ou définissez un budget de tokens dans les paramètres.";
   }
+  renderProjection(b);
 
   // --- Compte ---
   // Le comptage local n'a d'intérêt que sans source compte : masqué dès

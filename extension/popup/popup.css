@@ -199,3 +199,12 @@ button.mini:hover {
 .hidden {
   display: none;
 }
+
+.sep {
+  border-top: 1px solid #eee;
+  margin: 10px 0;
+}
+
+#projection .note {
+  margin-top: 2px;
+}

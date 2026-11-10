@@ -21,7 +21,7 @@
   </header>
 
   <main>
-    <section class="conso">
+    <section class="card">
       <div class="conso-head">
         <span id="conso-label">Consommation</span>
         <span id="conso-pct" class="pct"></span>
@@ -29,16 +29,22 @@
       <div class="bar"><div id="bar-fill" class="fill"></div></div>
       <div id="conso-detail" class="detail"></div>
       <div id="conso-source" class="note"></div>
-    </section>
 
-    <section class="account">
-      <h2>Compte Mistral</h2>
+      <div class="sep"></div>
+
       <div class="kv hidden" id="plan-row"><span>Type de plan</span><strong id="acc-plan">—</strong></div>
       <div class="kv"><span>Crédits PAYG</span><strong id="acc-wallet">—</strong></div>
       <div class="kv"><span>Réinitialisation</span><strong id="acc-reset">—</strong></div>
       <div id="acc-reset-in" class="note right hidden"></div>
       <div class="kv hidden" id="key-row"><span>Clé API (BYOK)</span><button id="btn-config-key" class="mini">Configurer la clé API</button></div>
       <div id="acc-error" class="error hidden"></div>
+
+      <div id="projection" class="hidden">
+        <div class="sep"></div>
+        <div id="proj-rate" class="note"></div>
+        <div id="proj-end" class="note"></div>
+        <div id="proj-100" class="note"></div>
+      </div>
     </section>
 
     <section class="local">

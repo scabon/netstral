@@ -22,12 +22,14 @@ MISTRAL_API_KEY (optionnel) est juste seedé comme clé de chat (jamais affiché
 """
 import functools
 import json
+import math
 import os
 import shutil
 import socket
 import subprocess
 import sys
 import tempfile
+from datetime import datetime, timezone
 import threading
 import time
 import zipfile
@@ -480,9 +482,22 @@ def main() -> int:
               keyRowHidden: document.getElementById('key-row').classList.contains('hidden'),
               errHidden: document.getElementById('acc-error').classList.contains('hidden'),
               localHidden: document.querySelector('section.local').classList.contains('hidden'),
+              projHidden: document.getElementById('projection').classList.contains('hidden'),
+              projRate: document.getElementById('proj-rate').textContent,
+              projEnd: document.getElementById('proj-end').textContent,
+              proj100: document.getElementById('proj-100').textContent,
             };
             """
         )
+        # projection attendue (même calcul que popup.js : pct=21, reset 2026-12-01Z)
+        reset_ms = datetime(2026, 12, 1, tzinfo=timezone.utc).timestamp() * 1000
+        prev_ms = datetime(2026, 11, 1, tzinfo=timezone.utc).timestamp() * 1000
+        period = round((reset_ms - prev_ms) / 86400000)
+        days_left = max(0, math.ceil((reset_ms - time.time() * 1000) / 86400000))
+        elapsed = max(1, period - days_left)
+        rate = 21 / elapsed
+        end_pct = round(rate * period)
+        d100 = round((100 - 21) / rate)
         check(
             "C3: pop-up rend conso (21%) + plan Pro + reset dans Xj ; BYOK masquée, local masqué",
             pop
@@ -496,8 +511,14 @@ def main() -> int:
             and "dans" in pop["resetIn"] and "jour" in pop["resetIn"]
             and pop["keyRowHidden"] is True  # clé configurée -> ligne BYOK masquée
             and pop["errHidden"] is True   # source compte OK -> pas d'erreur de session
-            and pop["localHidden"] is True,  # comptage local masqué avec source compte
-            json.dumps(pop, ensure_ascii=False)[:220],
+            and pop["localHidden"] is True  # comptage local masqué avec source compte
+            and pop["projHidden"] is False
+            and "%/jour" in pop["projRate"]
+            and f"~{end_pct} %" in pop["projEnd"]
+            and f"dans {days_left} j" in pop["projEnd"]
+            and "100 %" in pop["proj100"] and f"~{d100} j" in pop["proj100"],
+            json.dumps(pop, ensure_ascii=False)[:220]
+            + f" | attendu: end~{end_pct}% dans {days_left}j, 100% dans ~{d100}j",
         )
 
         # C3b : repli comptage local (#local) -> section local visible.
@@ -513,17 +534,21 @@ def main() -> int:
               detail: document.getElementById('conso-detail').textContent,
               localHidden: document.querySelector('section.local').classList.contains('hidden'),
               tokens: document.getElementById('local-tokens').textContent,
+              projHidden: document.getElementById('projection').classList.contains('hidden'),
+              projEnd: document.getElementById('proj-end').textContent,
             };
             """
         )
         norm = lambda s: (s or "").replace(" ", "").replace("\u202f", "").replace("\u00a0", "")
         check(
-            "C3b: repli local -> 15%, 150/1000 tokens, section local visible",
+            "C3b: repli local -> 15%, 150/1000 tokens, section local visible, projection mois calendaire",
             pop_local
             and norm(pop_local["pct"]) == "15%"
             and "150" in pop_local["detail"] and "1000" in norm(pop_local["detail"])
             and pop_local["localHidden"] is False
-            and norm(pop_local["tokens"]) == "15",
+            and norm(pop_local["tokens"]) == "15"
+            and pop_local["projHidden"] is False
+            and "Fin de période" in pop_local["projEnd"],
             json.dumps(pop_local, ensure_ascii=False)[:200],
         )
         # C3c : #nokey -> plan masqué, bouton « Configurer la clé API » -> options
