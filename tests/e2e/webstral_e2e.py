@@ -262,10 +262,8 @@ def build_srv(srv_dir: Path) -> None:
     srv_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy(EXT_DIR / "i18n.js", srv_dir / "i18n.js")
     shutil.copy(EXT_DIR / "changelog.js", srv_dir / "changelog.js")
-    shutil.copy(EXT_DIR / "shared.css", srv_dir / "shared.css")
     shutil.copytree(EXT_DIR / "sidepanel", srv_dir / "sidepanel")
     shutil.copytree(EXT_DIR / "popup", srv_dir / "popup")
-    shutil.copytree(EXT_DIR / "pages", srv_dir / "pages")
     sp = (srv_dir / "sidepanel" / "sidepanel.html").read_text(encoding="utf-8")
     (srv_dir / "sidepanel" / "sidepanel.html").write_text(
         sp.replace(
@@ -465,6 +463,19 @@ def main() -> int:
               document.getElementById('btn-back-changelog').click();
               r.backFromChangelog = !document.getElementById('view-main').classList.contains('hidden');
               r.changelogDisplayBack = getComputedStyle(document.getElementById('view-changelog')).display;
+              // à propos : menu ⋮ -> À propos -> vue about (i18n), retour <- vue main
+              document.getElementById('btn-menu').click();
+              document.getElementById('btn-about').click();
+              r.aboutShown = !document.getElementById('view-about').classList.contains('hidden');
+              r.aboutDisplay = getComputedStyle(document.getElementById('view-about')).display;
+              r.mainDisplayAbout = getComputedStyle(document.getElementById('view-main')).display;
+              r.aboutSections = document.querySelectorAll('#aboutContent h3').length;
+              r.aboutBrand = (document.querySelector('#aboutContent .brand-line') || {}).textContent || '';
+              r.aboutGithub = !!document.querySelector('#aboutContent a[href*="github.com/scabon/webstral"]');
+              r.aboutNoTab = (document.body.dataset.tabsCreate || '').indexOf('pages/') === -1;
+              document.getElementById('btn-back-about').click();
+              r.backFromAbout = !document.getElementById('view-main').classList.contains('hidden');
+              r.aboutDisplayBack = getComputedStyle(document.getElementById('view-about')).display;
               const th = document.getElementById('themeSelect');
               th.value = 'dark'; th.dispatchEvent(new Event('change'));
               const lg = document.getElementById('langSelect');
@@ -480,7 +491,7 @@ def main() -> int:
             """
         )
         check(
-            "C2: vues dédiées (⋮ -> Réglages/Changelog -> retour), dark + EN, drapeaux, alertes, clé",
+            "C2: vues dédiées (⋮ -> Réglages/Changelog/À propos -> retour), dark + EN, drapeaux, alertes, clé",
             disp is not None
             and disp.get("mainVisible") is True
             and disp.get("settingsHidden") is True
@@ -497,10 +508,19 @@ def main() -> int:
             and disp.get("changelogDisplay") == "flex"
             and disp.get("mainDisplayChangelog") == "none"
             and disp.get("settingsDisplayChangelog") == "none"
-            and disp.get("changelogEntries", 0) >= 19
-            and disp.get("changelogTop", "").startswith("v0.5.2")
+            and disp.get("changelogEntries", 0) >= 20
+            and disp.get("changelogTop", "").startswith("v0.5.3")
             and disp.get("backFromChangelog") is True
             and disp.get("changelogDisplayBack") == "none"
+            and disp.get("aboutShown") is True
+            and disp.get("aboutDisplay") == "flex"
+            and disp.get("mainDisplayAbout") == "none"
+            and disp.get("aboutSections") == 4
+            and "v" in disp.get("aboutBrand", "")
+            and disp.get("aboutGithub") is True
+            and disp.get("aboutNoTab") is True
+            and disp.get("backFromAbout") is True
+            and disp.get("aboutDisplayBack") == "none"
             and disp.get("setTitleFr") == "Réglages"
             and disp.get("theme") == "dark"
             and disp.get("setTitleEn") == "Settings"
@@ -690,6 +710,7 @@ def main() -> int:
               refreshCalled: document.body.dataset.refreshBudget || '',
               sourceAvant,
               tabsCreate: document.body.dataset.tabsCreate || '',
+              aboutView: getComputedStyle(document.getElementById('view-about')).display,
               linkConsole: (document.getElementById('link-console') || {}).href || '',
               linkSub: (document.getElementById('link-subscription') || {}).href || '',
             };
@@ -707,7 +728,8 @@ def main() -> int:
             and menu["refreshCalled"] == "1"
             and "lu il y a" in menu["sourceAvant"]
             and "Source" not in menu["sourceAvant"]
-            and "pages/about.html" in menu["tabsCreate"]
+            and menu["aboutView"] == "flex"
+            and "pages/" not in menu["tabsCreate"]
             and "console.mistral.ai" in menu["linkConsole"]
             and "admin.mistral.ai/subscription" in menu["linkSub"],
             json.dumps(menu, ensure_ascii=False)[:260],

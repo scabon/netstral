@@ -381,7 +381,8 @@ button.mini:hover {
 
 #view-main,
 #view-settings,
-#view-changelog {
+#view-changelog,
+#view-about {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -390,7 +391,8 @@ button.mini:hover {
 /* .hidden doit gagner sur le display:flex des vues (spécificité ID) */
 #view-main.hidden,
 #view-settings.hidden,
-#view-changelog.hidden {
+#view-changelog.hidden,
+#view-about.hidden {
   display: none;
 }
 
@@ -484,34 +486,62 @@ button.mini:hover {
   height: 15px;
 }
 
-/* ---- vue changelog ---- */
+/* ---- vues doc (changelog / about) ---- */
 
-.changelog {
+.doc {
   max-height: 420px;
   overflow-y: auto;
 }
 
-.changelog h3 {
+.doc h3 {
   font-size: 12px;
   font-weight: 700;
   margin: 12px 0 3px;
   color: var(--text);
 }
 
-.changelog h3:first-child {
+.doc h3:first-child {
   margin-top: 0;
 }
 
-.changelog p {
+.doc p {
   font-size: 12px;
   line-height: 1.45;
   color: var(--muted2);
 }
 
-.changelog code {
+.doc code {
   font-family: ui-monospace, Consolas, monospace;
   font-size: 11px;
   background: var(--bar-bg);
   border-radius: 4px;
   padding: 1px 4px;
+}
+
+.doc a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.doc a:hover {
+  text-decoration: underline;
+}
+
+/* ---- vue about ---- */
+
+.about .brand-line {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.about .lead {
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.about .links-list a {
+  display: inline-block;
+  margin: 1px 0;
 }

@@ -245,6 +245,7 @@ async function load() {
     if (chrome.runtime.lastError) throw new Error(chrome.runtime.lastError.message);
     t = WebstralI18n.makeT(state.lang ?? "fr");
     WebstralI18n.applyI18n(document, t);
+    buildAbout(); // contenu dynamique : dépend de la langue résolue
     WebstralI18n.applyTheme(state.settings?.theme ?? "system");
     document.documentElement.lang = state.lang ?? "fr";
     if (apiKeyInput.value === "") {
@@ -285,8 +286,8 @@ notifyOnResetEl.addEventListener("change", () =>
   saveSettings({ notifyOnReset: notifyOnResetEl.checked })
 );
 
-// Navigation entre les vues (main / réglages / changelog), comme wagonBAR.
-const VIEWS = ["main", "settings", "changelog"];
+// Navigation entre les vues (main / réglages / changelog / à propos), comme wagonBAR.
+const VIEWS = ["main", "settings", "changelog", "about"];
 
 function showView(name) {
   for (const v of VIEWS) $(`view-${v}`).classList.toggle("hidden", v !== name);
@@ -312,6 +313,68 @@ function buildChangelog() {
   el.replaceChildren(frag);
 }
 buildChangelog();
+
+// ---------- À propos (contenu i18n, reconstruit à chaque changement de langue) ----------
+
+function buildAbout() {
+  const el = $("aboutContent");
+  const frag = document.createDocumentFragment();
+
+  const brand = document.createElement("p");
+  brand.className = "brand-line";
+  let ver = "";
+  try {
+    ver = chrome.runtime.getManifest().version;
+  } catch (e) {
+    // page de test (e2e localhost)
+  }
+  brand.textContent = `${t("appName")}${ver ? ` v${ver}` : ""}`;
+
+  const lead = document.createElement("p");
+  lead.className = "lead";
+  lead.textContent = t("about_lead");
+  frag.append(brand, lead);
+
+  const sections = [
+    ["about_byok_h", "about_byok_p"],
+    ["about_usage_h", "about_usage_p"],
+  ];
+  for (const [hk, pk] of sections) {
+    const h = document.createElement("h3");
+    h.textContent = t(hk);
+    const p = document.createElement("p");
+    p.textContent = t(pk);
+    frag.append(h, p);
+  }
+
+  const linksH = document.createElement("h3");
+  linksH.textContent = t("about_links_h");
+  const links = document.createElement("p");
+  links.className = "links-list";
+  const defs = [
+    ["about_links_keys", "https://console.mistral.ai/api-keys"],
+    ["about_links_sub", "https://admin.mistral.ai/subscription"],
+    ["about_links_src", "https://github.com/scabon/webstral"],
+  ];
+  for (const [k, href] of defs) {
+    const a = document.createElement("a");
+    a.href = href;
+    a.target = "_blank";
+    a.rel = "noreferrer";
+    a.textContent = t(k);
+    links.append(a, document.createElement("br"));
+  }
+  frag.append(linksH, links);
+
+  const projH = document.createElement("h3");
+  projH.textContent = t("about_project_h");
+  const projP = document.createElement("p");
+  projP.textContent = t("about_project_p");
+  frag.append(projH, projP);
+
+  el.replaceChildren(frag);
+}
+buildAbout();
 
 let keyTimer = null;
 apiKeyInput.addEventListener("input", () => {
@@ -351,9 +414,7 @@ btnRefresh.addEventListener("click", async () => {
 });
 
 btnChangelog.addEventListener("click", () => showView("changelog"));
-btnAbout.addEventListener("click", () =>
-  chrome.tabs.create({ url: chrome.runtime.getURL("pages/about.html") })
-);
+btnAbout.addEventListener("click", () => showView("about"));
 
 // Rafraîchit en direct quand le badge/les données/les réglages bougent.
 chrome.storage.onChanged.addListener((changes, area) => {

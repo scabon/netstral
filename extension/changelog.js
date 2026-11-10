@@ -5,6 +5,10 @@
 // Chaque entrée : { h: "vX.Y.Z — titre", p: "paragraphe (HTML accepté)" }.
 window.WebstralChangelog = [
   {
+    h: "v0.5.3 — à propos dans la pop-up",
+    p: "La page « À propos » migre à son tour dans la pop-up : vue dédiée (menu ⋮ → À propos, bouton retour ←), construite depuis les clés i18n existantes et reconstruite au changement de langue. <code>pages/about.html</code> et <code>shared.css</code> disparaissent — l'extension n'a plus aucune page hors pop-up / side panel.",
+  },
+  {
     h: "v0.5.2 — changelog dans la pop-up",
     p: "Le changelog migre dans la pop-up : vue dédiée « Changelog » ouverte depuis le menu ⋮ (bouton retour ←, pattern wagonBAR), comme les réglages. La page <code>pages/changelog.html</code> disparaît ; les entrées vivent dans <code>changelog.js</code>.",
   },
