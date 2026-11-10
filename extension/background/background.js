@@ -476,6 +476,7 @@ const DEFAULT_SETTINGS = {
   theme: "system", // system | light | dark
   alertsEnabled: true,
   alertPct: 90,
+  notifyOnReset: true,
 };
 
 function monthKey(date = new Date()) {
@@ -578,6 +579,7 @@ async function computeBadgeState() {
 async function updateBadge() {
   const settings = await getSettings();
   const state = await computeBadgeState();
+  await maybeNotifyReset(state, settings);
   if (state.pct != null) {
     const t = tFor(settings);
     const amount =
@@ -624,6 +626,27 @@ async function maybeNotify(state, settings) {
   } else if (state.pct < settings.alertPct && alerted != null) {
     await chrome.storage.local.set({ alertState: { alertedPct: null } });
   }
+}
+
+// Notification quand la période de facturation change (resetAt reçu ou
+// nouveau mois calendaire en repli local) : une seule fois par période,
+// et jamais au premier démarrage (pas de période précédente connue).
+async function maybeNotifyReset(state, settings) {
+  if (settings.notifyOnReset === false) return;
+  const periodKey = state.resetAt ?? monthKey();
+  const { resetNotif } = await chrome.storage.local.get("resetNotif");
+  const last = resetNotif?.period ?? null;
+  if (last === periodKey) return;
+  if (last != null && chrome.notifications?.create) {
+    const t = tFor(settings);
+    await chrome.notifications.create({
+      type: "basic",
+      iconUrl: "icons/icon-128.png",
+      title: t("notif_reset_title"),
+      message: t("notif_reset_body"),
+    });
+  }
+  await chrome.storage.local.set({ resetNotif: { period: periodKey } });
 }
 
 function round2(n) {
@@ -701,6 +724,7 @@ async function getPopupState() {
       theme: settings.theme ?? "system",
       alertsEnabled: settings.alertsEnabled !== false,
       alertPct: settings.alertPct ?? 90,
+      notifyOnReset: settings.notifyOnReset !== false,
     },
     account: {
       consoleCredits: st.consoleCredits ?? null,

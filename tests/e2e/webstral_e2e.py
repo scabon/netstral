@@ -176,7 +176,7 @@ POPUP_MOCK = """
         pct: 21, color: "#1a7f37", spent: 53.55, total: 255, currency: "EUR",
         resetAt: "2026-12-01T00:00:00Z", fetchedAt: Date.now() - 5 * 60000,
       },
-      settings: { warnPct: 70, dangerPct: 90, monthlyBudgetTokens: null, lang: "system", theme: "system", alertsEnabled: true, alertPct: 90 },
+      settings: { warnPct: 70, dangerPct: 90, monthlyBudgetTokens: null, lang: "system", theme: "system", alertsEnabled: true, alertPct: 90, notifyOnReset: true },
       account: {
         consoleCredits: { fetchedAt: Date.now(), total: 100, spent: 40, currency: "EUR" },
         consoleCreditsError: null,
@@ -194,7 +194,7 @@ POPUP_MOCK = """
       state.settings = {
         warnPct: 70, dangerPct: 90, monthlyBudgetTokens: null,
         lang: s.lang ?? "system", theme: s.theme ?? "system",
-        alertsEnabled: s.alertsEnabled !== false, alertPct: s.alertPct ?? 90,
+        alertsEnabled: s.alertsEnabled !== false, alertPct: s.alertPct ?? 90, notifyOnReset: s.notifyOnReset !== false,
       };
       state.lang = WebstralI18n.resolveLang(s.lang, "fr-FR");
       state.hasApiKey = Boolean(store.apiKey);
@@ -431,17 +431,27 @@ def main() -> int:
             return (async () => {
               const r = {};
               r.themeAvant = document.documentElement.dataset.theme;
-              r.setTitleFr = document.querySelector('.settings h2').textContent;
+              r.setTitleFr = document.querySelector('#view-settings h2').textContent;
               r.keyFilled = document.getElementById('apiKey').value !== '';
               r.alerts = document.getElementById('alertsEnabled').checked;
               r.alertPct = String(document.getElementById('alertPct').value);
+              r.notifyReset = document.getElementById('notifyOnReset').checked;
+              // navigation : menu ⋮ -> Réglages -> vue settings, retour <- vue main
+              r.mainVisible = !document.getElementById('view-main').classList.contains('hidden');
+              r.settingsHidden = document.getElementById('view-settings').classList.contains('hidden');
+              document.getElementById('btn-menu').click();
+              document.getElementById('btn-settings').click();
+              r.settingsShown = !document.getElementById('view-settings').classList.contains('hidden');
+              r.menuClosed = document.getElementById('menu').classList.contains('hidden');
+              document.getElementById('btn-back').click();
+              r.backToMain = !document.getElementById('view-main').classList.contains('hidden');
               const th = document.getElementById('themeSelect');
               th.value = 'dark'; th.dispatchEvent(new Event('change'));
               const lg = document.getElementById('langSelect');
               lg.value = 'en'; lg.dispatchEvent(new Event('change'));
               await new Promise((res) => setTimeout(res, 400));
               r.theme = document.documentElement.dataset.theme;
-              r.setTitleEn = document.querySelector('.settings h2').textContent;
+              r.setTitleEn = document.querySelector('#view-settings h2').textContent;
               r.langVal = document.getElementById('langSelect').value;
               r.flagTheme = (document.querySelector('#themeSelect option[value="dark"]') || {}).textContent || '';
               r.flagLang = (document.querySelector('#langSelect option[value="fr"]') || {}).textContent || '';
@@ -450,8 +460,13 @@ def main() -> int:
             """
         )
         check(
-            "C2: réglages pop-up — dark + EN appliqués, drapeaux, alertes 90%, clé pré-remplie",
+            "C2: réglages en vue dédiée (menu ⋮ -> Réglages -> retour), dark + EN, drapeaux, alertes, clé",
             disp is not None
+            and disp.get("mainVisible") is True
+            and disp.get("settingsHidden") is True
+            and disp.get("settingsShown") is True
+            and disp.get("menuClosed") is True
+            and disp.get("backToMain") is True
             and disp.get("setTitleFr") == "Réglages"
             and disp.get("theme") == "dark"
             and disp.get("setTitleEn") == "Settings"
@@ -460,8 +475,9 @@ def main() -> int:
             and "🇫🇷" in disp.get("flagLang", "")
             and disp.get("alerts") is True
             and disp.get("alertPct") == "90"
+            and disp.get("notifyReset") is True
             and disp.get("keyFilled") is True,
-            json.dumps(disp, ensure_ascii=False)[:240],
+            json.dumps(disp, ensure_ascii=False)[:300],
         )
 
         # ---- Phase C3 : copie localhost de la pop-up (chrome mock)

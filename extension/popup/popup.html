@@ -13,95 +13,108 @@
     <button id="btn-chat" class="icon-btn" data-i18n-title="menu_openChat" title="Ouvrir le chat">&#128172;</button>
     <button id="btn-menu" title="Menu">&#8942;</button>
     <nav id="menu" class="menu hidden">
+      <button id="btn-settings" data-i18n="menu_settings">Réglages</button>
+      <hr>
       <button id="btn-changelog" data-i18n="menu_changelog">Changelog</button>
       <button id="btn-about" data-i18n="menu_about">À propos</button>
     </nav>
   </header>
 
   <main>
-    <section class="card">
-      <div class="conso-head">
-        <span id="conso-label" data-i18n="conso_title">Consommation</span>
-        <span id="conso-pct" class="pct"></span>
-      </div>
-      <div class="bar"><div id="bar-fill" class="fill"></div></div>
-      <div id="conso-detail" class="detail"></div>
-      <div class="conso-foot">
-        <span id="conso-source" class="note"></span>
-        <button id="btn-refresh" class="icon-btn" data-i18n-title="menu_refresh" title="Actualiser la conso">&#8635;</button>
-      </div>
+    <div id="view-main">
+      <section class="card">
+        <div class="conso-head">
+          <span id="conso-label" data-i18n="conso_title">Consommation</span>
+          <span id="conso-pct" class="pct"></span>
+        </div>
+        <div class="bar"><div id="bar-fill" class="fill"></div></div>
+        <div id="conso-detail" class="detail"></div>
+        <div class="conso-foot">
+          <span id="conso-source" class="note"></span>
+          <button id="btn-refresh" class="icon-btn" data-i18n-title="menu_refresh" title="Actualiser la conso">&#8635;</button>
+        </div>
 
-      <div class="sep"></div>
-
-      <div class="kv hidden" id="plan-row"><span data-i18n="plan_label">Type de plan</span><strong id="acc-plan">—</strong></div>
-      <div class="kv"><span data-i18n="wallet_label">Crédits PAYG</span><strong id="acc-wallet">—</strong></div>
-      <div class="kv"><span data-i18n="reset_label">Réinitialisation</span><strong id="acc-reset">—</strong></div>
-      <div id="acc-reset-in" class="note right hidden"></div>
-      <div id="acc-error" class="error hidden"></div>
-
-      <div id="projection" class="hidden">
         <div class="sep"></div>
-        <div class="note proj-title" data-i18n="proj_title">Projection fin de période</div>
-        <div class="proj-bar">
-          <div id="proj-over100" class="proj-over100"></div>
-          <div id="proj-fill" class="proj-fill"></div>
-          <div id="proj-tick100" class="proj-tick100"></div>
-          <div id="proj-mark" class="proj-mark"></div>
-          <div id="proj-mark-label" class="proj-mark-label"></div>
-        </div>
-        <div class="proj-scale note"><span>0</span><span>100 %</span></div>
-        <div id="proj-rate" class="note"></div>
-        <div id="proj-100" class="note"></div>
-      </div>
-    </section>
 
-    <section class="settings">
-      <h2 data-i18n="set_title">Réglages</h2>
-      <div class="form-group">
-        <label for="themeSelect" data-i18n="set_theme_label">Thème</label>
-        <select id="themeSelect">
-          <option value="system" data-i18n="set_theme_system" data-flag="&#128421;&#65039;">Système</option>
-          <option value="light" data-i18n="set_theme_light" data-flag="&#9728;&#65039;">Clair</option>
-          <option value="dark" data-i18n="set_theme_dark" data-flag="&#127769;">Sombre</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label for="langSelect" data-i18n="set_lang_label">Langue</label>
-        <select id="langSelect">
-          <option value="system" data-i18n="set_lang_system" data-flag="&#127760;">Système</option>
-          <option value="en">&#127468;&#127463; English</option>
-          <option value="fr">&#127467;&#127479; Français</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="checkbox-row">
-          <input type="checkbox" id="alertsEnabled">
-          <span data-i18n="set_alerts_enabled">Activer les notifications</span>
-        </label>
-        <div class="row">
-          <label for="alertPct" data-i18n="set_alert_pct_label">Me notifier à (%)</label>
-          <input type="number" id="alertPct" min="1" max="100">
-        </div>
-      </div>
-      <div class="form-group">
-        <label for="apiKey" data-i18n="set_key_label">Clé API Mistral</label>
-        <div class="row">
-          <input type="password" id="apiKey" data-i18n-ph="set_key_ph" placeholder="Ex. …" autocomplete="off" spellcheck="false">
-          <button id="btnToggleKey" class="icon-btn" title="Afficher/masquer">&#128065;</button>
-        </div>
-      </div>
-    </section>
+        <div class="kv hidden" id="plan-row"><span data-i18n="plan_label">Type de plan</span><strong id="acc-plan">—</strong></div>
+        <div class="kv"><span data-i18n="wallet_label">Crédits PAYG</span><strong id="acc-wallet">—</strong></div>
+        <div class="kv"><span data-i18n="reset_label">Réinitialisation</span><strong id="acc-reset">—</strong></div>
+        <div id="acc-reset-in" class="note right hidden"></div>
+        <div id="acc-error" class="error hidden"></div>
 
-    <section class="local">
-      <h2 data-i18n="local_title">Webstral ce mois-ci</h2>
-      <div class="kv"><span data-i18n="local_tokens">Tokens (comptage local)</span><strong id="local-tokens">—</strong></div>
-    </section>
+        <div id="projection" class="hidden">
+          <div class="sep"></div>
+          <div class="note proj-title" data-i18n="proj_title">Projection fin de période</div>
+          <div class="proj-bar">
+            <div id="proj-over100" class="proj-over100"></div>
+            <div id="proj-fill" class="proj-fill"></div>
+            <div id="proj-tick100" class="proj-tick100"></div>
+            <div id="proj-mark" class="proj-mark"></div>
+            <div id="proj-mark-label" class="proj-mark-label"></div>
+          </div>
+          <div class="proj-scale note"><span>0</span><span>100 %</span></div>
+          <div id="proj-rate" class="note"></div>
+          <div id="proj-100" class="note"></div>
+        </div>
+      </section>
 
-    <footer class="links">
-      <a id="link-console" href="https://console.mistral.ai/" target="_blank" rel="noreferrer" data-i18n="menu_console">Console Mistral</a>
-      <span class="dot">·</span>
-      <a id="link-subscription" href="https://admin.mistral.ai/subscription" target="_blank" rel="noreferrer" data-i18n="menu_subscription">Abonnement (admin)</a>
-    </footer>
+      <section class="local">
+        <h2 data-i18n="local_title">Webstral ce mois-ci</h2>
+        <div class="kv"><span data-i18n="local_tokens">Tokens (comptage local)</span><strong id="local-tokens">—</strong></div>
+      </section>
+
+      <footer class="links">
+        <a id="link-console" href="https://console.mistral.ai/" target="_blank" rel="noreferrer" data-i18n="menu_console">Console Mistral</a>
+        <span class="dot">·</span>
+        <a id="link-subscription" href="https://admin.mistral.ai/subscription" target="_blank" rel="noreferrer" data-i18n="menu_subscription">Abonnement (admin)</a>
+      </footer>
+    </div>
+
+    <div id="view-settings" class="hidden">
+      <div class="back-row">
+        <button id="btn-back" class="icon-btn" data-i18n-title="back" title="Retour">&#8592;</button>
+        <h2 data-i18n="set_title">Réglages</h2>
+      </div>
+      <section class="settings">
+        <div class="form-group">
+          <label for="themeSelect" data-i18n="set_theme_label">Thème</label>
+          <select id="themeSelect">
+            <option value="system" data-i18n="set_theme_system" data-flag="&#128421;&#65039;">Système</option>
+            <option value="light" data-i18n="set_theme_light" data-flag="&#9728;&#65039;">Clair</option>
+            <option value="dark" data-i18n="set_theme_dark" data-flag="&#127769;">Sombre</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="langSelect" data-i18n="set_lang_label">Langue</label>
+          <select id="langSelect">
+            <option value="system" data-i18n="set_lang_system" data-flag="&#127760;">Système</option>
+            <option value="en">&#127468;&#127463; English</option>
+            <option value="fr">&#127467;&#127479; Français</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="checkbox-row">
+            <input type="checkbox" id="alertsEnabled">
+            <span data-i18n="set_alerts_enabled">Activer les notifications</span>
+          </label>
+          <div class="row">
+            <label for="alertPct" data-i18n="set_alert_pct_label">Me notifier à (%)</label>
+            <input type="number" id="alertPct" min="1" max="100">
+          </div>
+          <label class="checkbox-row">
+            <input type="checkbox" id="notifyOnReset">
+            <span data-i18n="set_notify_reset">Me notifier à la réinitialisation du quota</span>
+          </label>
+        </div>
+        <div class="form-group">
+          <label for="apiKey" data-i18n="set_key_label">Clé API Mistral</label>
+          <div class="row">
+            <input type="password" id="apiKey" data-i18n-ph="set_key_ph" placeholder="Ex. …" autocomplete="off" spellcheck="false">
+            <button id="btnToggleKey" class="icon-btn" title="Afficher/masquer">&#128065;</button>
+          </div>
+        </div>
+      </section>
+    </div>
   </main>
 
   <script src="../i18n.js"></script>

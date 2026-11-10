@@ -31,6 +31,7 @@ const themeSelect = $("themeSelect");
 const langSelect = $("langSelect");
 const alertsEnabledEl = $("alertsEnabled");
 const alertPctInput = $("alertPct");
+const notifyOnResetEl = $("notifyOnReset");
 const apiKeyInput = $("apiKey");
 const btnToggleKey = $("btnToggleKey");
 
@@ -38,6 +39,8 @@ const btnMenu = $("btn-menu");
 const menuEl = $("menu");
 const btnChat = $("btn-chat");
 const btnRefresh = $("btn-refresh");
+const btnSettings = $("btn-settings");
+const btnBack = $("btn-back");
 const btnChangelog = $("btn-changelog");
 const btnAbout = $("btn-about");
 
@@ -234,6 +237,7 @@ function render(state) {
   langSelect.value = s.lang ?? "system";
   alertsEnabledEl.checked = s.alertsEnabled !== false;
   alertPctInput.value = s.alertPct ?? 90;
+  notifyOnResetEl.checked = s.notifyOnReset !== false;
 }
 
 async function load() {
@@ -278,6 +282,18 @@ alertPctInput.addEventListener("input", () => {
   const v = Math.min(100, Math.max(1, Number(alertPctInput.value) || 90));
   saveSettings({ alertPct: v });
 });
+notifyOnResetEl.addEventListener("change", () =>
+  saveSettings({ notifyOnReset: notifyOnResetEl.checked })
+);
+
+// Navigation entre les vues (main / réglages), comme wagonBAR.
+function showView(name) {
+  $("view-main").classList.toggle("hidden", name !== "main");
+  $("view-settings").classList.toggle("hidden", name !== "settings");
+  menuEl.classList.add("hidden");
+}
+btnSettings.addEventListener("click", () => showView("settings"));
+btnBack.addEventListener("click", () => showView("main"));
 
 let keyTimer = null;
 apiKeyInput.addEventListener("input", () => {

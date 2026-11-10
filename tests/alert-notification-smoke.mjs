@@ -14,6 +14,7 @@ const code = readFileSync(
 const messageListeners = [];
 const notifications = [];
 let pct = 95; // % renvoyé par le mock admin (vibe_budget)
+let resetAt = "2026-12-01T00:00:00Z";
 const stored = {
   apiKey: "k",
   settings: {
@@ -24,6 +25,7 @@ const stored = {
     theme: "system",
     alertsEnabled: true,
     alertPct: 90,
+    notifyOnReset: true,
   },
 };
 
@@ -44,7 +46,7 @@ globalThis.fetch = async (url) => {
                 usage_percentage: pct,
                 initial_budget: 255,
                 currency: "EUR",
-                reset_at: "2026-12-01T00:00:00Z",
+                reset_at: resetAt,
               },
             },
           },
@@ -143,6 +145,27 @@ stored.settings.alertsEnabled = false;
 stored.alertState = { alertedPct: null };
 await send({ type: "refreshBudget" });
 check("alertes off -> pas de notif", notifications.length === 2);
+
+// 5. changement de période (resetAt) -> notif « quota réinitialisé »
+resetAt = "2027-01-01T00:00:00Z";
+let before = notifications.length;
+await send({ type: "refreshBudget" });
+check(
+  "reset de période -> notif réinitialisation",
+  notifications.length === before + 1 &&
+    notifications.at(-1).title.includes("réinitialisé"),
+  JSON.stringify(notifications.at(-1) ?? null)
+);
+
+// 6. même période -> pas de notif reset
+await send({ type: "refreshBudget" });
+check("même période -> pas de notif reset", notifications.length === before + 1);
+
+// 7. notifyOnReset désactivé -> rien même si période change
+stored.settings.notifyOnReset = false;
+resetAt = "2027-02-01T00:00:00Z";
+await send({ type: "refreshBudget" });
+check("notifyOnReset off -> pas de notif reset", notifications.length === before + 1);
 
 const pass = results.every(Boolean);
 console.log(pass ? "PASS" : "FAIL");

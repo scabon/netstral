@@ -377,6 +377,25 @@ button.mini:hover {
   color: var(--muted);
 }
 
+/* ---- vues (main / réglages) ---- */
+
+#view-main,
+#view-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.back-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.back-row h2 {
+  margin-bottom: 0;
+}
+
 /* ---- carte réglages (style wagonBAR : selects à drapeaux/icônes) ---- */
 
 .settings h2 {
