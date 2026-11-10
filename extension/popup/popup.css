@@ -103,6 +103,10 @@ header {
 }
 
 .menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
   border: none;
   background: none;
   text-align: left;
@@ -113,14 +117,12 @@ header {
   color: var(--text);
 }
 
-.menu button:hover {
-  background: var(--hover);
+.menu button svg {
+  flex-shrink: 0;
 }
 
-.menu hr {
-  border: none;
-  border-top: 1px solid var(--border);
-  margin: 4px 6px;
+.menu button:hover {
+  background: var(--hover);
 }
 
 main {
@@ -381,6 +383,7 @@ button.mini:hover {
 
 #view-main,
 #view-settings,
+#view-help,
 #view-changelog,
 #view-about {
   display: flex;
@@ -391,6 +394,7 @@ button.mini:hover {
 /* .hidden doit gagner sur le display:flex des vues (spécificité ID) */
 #view-main.hidden,
 #view-settings.hidden,
+#view-help.hidden,
 #view-changelog.hidden,
 #view-about.hidden {
   display: none;
@@ -544,4 +548,45 @@ button.mini:hover {
 .about .links-list a {
   display: inline-block;
   margin: 1px 0;
+}
+
+.about .about-note {
+  font-style: italic;
+}
+
+.about .about-line a {
+  font-weight: 600;
+}
+
+.donate-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.donate-row a {
+  flex: 1;
+  padding: 6px 8px;
+  border-radius: 6px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  color: #fff;
+}
+
+.donate-liberapay {
+  background: #1a1717;
+}
+
+.donate-liberapay:hover {
+  background: #000;
+}
+
+.donate-tipeee {
+  background: #cb1b30;
+}
+
+.donate-tipeee:hover {
+  background: #a81426;
 }

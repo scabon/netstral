@@ -5,6 +5,10 @@
 // Chaque entrée : { h: "vX.Y.Z — titre", p: "paragraphe (HTML accepté)" }.
 window.WebstralChangelog = [
   {
+    h: "v0.5.4 — menu à icônes, vue Aide, à propos façon wagonBAR",
+    p: "Les entrées du menu ⋮ ont des icônes SVG (style wagonBAR). L'ancien contenu « À propos » (BYOK, conso du compte, liens, projet) devient la vue « Aide ». La vue « À propos » reprend le modèle wagonBAR : lien vers cabon14.com, mail support@cabon14.com et boutons de dons Liberapay / Tipeee (URL Tipeee fr/en selon la langue).",
+  },
+  {
     h: "v0.5.3 — à propos dans la pop-up",
     p: "La page « À propos » migre à son tour dans la pop-up : vue dédiée (menu ⋮ → À propos, bouton retour ←), construite depuis les clés i18n existantes et reconstruite au changement de langue. <code>pages/about.html</code> et <code>shared.css</code> disparaissent — l'extension n'a plus aucune page hors pop-up / side panel.",
   },

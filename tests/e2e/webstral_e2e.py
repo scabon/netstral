@@ -463,7 +463,19 @@ def main() -> int:
               document.getElementById('btn-back-changelog').click();
               r.backFromChangelog = !document.getElementById('view-main').classList.contains('hidden');
               r.changelogDisplayBack = getComputedStyle(document.getElementById('view-changelog')).display;
-              // à propos : menu ⋮ -> À propos -> vue about (i18n), retour <- vue main
+              // aide : menu ⋮ -> Aide -> vue help (i18n), retour <- vue main
+              document.getElementById('btn-menu').click();
+              r.menuIcons = document.querySelectorAll('#menu button svg').length;
+              document.getElementById('btn-help').click();
+              r.helpShown = !document.getElementById('view-help').classList.contains('hidden');
+              r.helpDisplay = getComputedStyle(document.getElementById('view-help')).display;
+              r.mainDisplayHelp = getComputedStyle(document.getElementById('view-main')).display;
+              r.helpSections = document.querySelectorAll('#helpContent h3').length;
+              r.helpGithub = !!document.querySelector('#helpContent a[href*="github.com/scabon/webstral"]');
+              document.getElementById('btn-back-help').click();
+              r.backFromHelp = !document.getElementById('view-main').classList.contains('hidden');
+              r.helpDisplayBack = getComputedStyle(document.getElementById('view-help')).display;
+              // à propos : menu ⋮ -> À propos -> vue about (site/support/dons), retour <- vue main
               document.getElementById('btn-menu').click();
               document.getElementById('btn-about').click();
               r.aboutShown = !document.getElementById('view-about').classList.contains('hidden');
@@ -471,7 +483,10 @@ def main() -> int:
               r.mainDisplayAbout = getComputedStyle(document.getElementById('view-main')).display;
               r.aboutSections = document.querySelectorAll('#aboutContent h3').length;
               r.aboutBrand = (document.querySelector('#aboutContent .brand-line') || {}).textContent || '';
-              r.aboutGithub = !!document.querySelector('#aboutContent a[href*="github.com/scabon/webstral"]');
+              r.aboutSite = !!document.querySelector('#aboutContent a[href*="cabon14.com"]');
+              r.aboutSupport = !!document.querySelector('#aboutContent a[href^="mailto:support@cabon14.com"]');
+              r.aboutLiberapay = !!document.querySelector('#aboutContent a.donate-liberapay[href*="liberapay.com/cabon14"]');
+              r.aboutTipeee = !!document.querySelector('#aboutContent a.donate-tipeee[href*="tipeee.com/cabon14"]');
               r.aboutNoTab = (document.body.dataset.tabsCreate || '').indexOf('pages/') === -1;
               document.getElementById('btn-back-about').click();
               r.backFromAbout = !document.getElementById('view-main').classList.contains('hidden');
@@ -491,7 +506,7 @@ def main() -> int:
             """
         )
         check(
-            "C2: vues dédiées (⋮ -> Réglages/Changelog/À propos -> retour), dark + EN, drapeaux, alertes, clé",
+            "C2: vues dédiées (⋮ -> Réglages/Aide/Changelog/À propos -> retour, icônes), dark + EN, drapeaux, alertes, clé",
             disp is not None
             and disp.get("mainVisible") is True
             and disp.get("settingsHidden") is True
@@ -508,16 +523,27 @@ def main() -> int:
             and disp.get("changelogDisplay") == "flex"
             and disp.get("mainDisplayChangelog") == "none"
             and disp.get("settingsDisplayChangelog") == "none"
-            and disp.get("changelogEntries", 0) >= 20
-            and disp.get("changelogTop", "").startswith("v0.5.3")
+            and disp.get("changelogEntries", 0) >= 21
+            and disp.get("changelogTop", "").startswith("v0.5.4")
             and disp.get("backFromChangelog") is True
             and disp.get("changelogDisplayBack") == "none"
+            and disp.get("menuIcons") == 4
+            and disp.get("helpShown") is True
+            and disp.get("helpDisplay") == "flex"
+            and disp.get("mainDisplayHelp") == "none"
+            and disp.get("helpSections") == 4
+            and disp.get("helpGithub") is True
+            and disp.get("backFromHelp") is True
+            and disp.get("helpDisplayBack") == "none"
             and disp.get("aboutShown") is True
             and disp.get("aboutDisplay") == "flex"
             and disp.get("mainDisplayAbout") == "none"
-            and disp.get("aboutSections") == 4
+            and disp.get("aboutSections") == 1
             and "v" in disp.get("aboutBrand", "")
-            and disp.get("aboutGithub") is True
+            and disp.get("aboutSite") is True
+            and disp.get("aboutSupport") is True
+            and disp.get("aboutLiberapay") is True
+            and disp.get("aboutTipeee") is True
             and disp.get("aboutNoTab") is True
             and disp.get("backFromAbout") is True
             and disp.get("aboutDisplayBack") == "none"

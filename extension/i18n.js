@@ -11,6 +11,7 @@ const I18N_MESSAGES = {
     menu_changelog: "Changelog",
     menu_about: "À propos",
     menu_settings: "Réglages",
+    menu_help: "Aide",
     back: "Retour",
     menu_console: "Console Mistral",
     menu_subscription: "Abonnement (admin)",
@@ -81,23 +82,34 @@ const I18N_MESSAGES = {
     sp_err_no_key_local: "Configurez votre clé API Mistral dans les réglages de la pop-up.",
     sp_hint: "Posez une question à Webstral.",
     sp_meta: "{in} tokens in, {out} tokens out",
-    // about
-    about_title: "Webstral — À propos",
-    about_lead:
+    // aide (contenu de la vue Aide)
+    help_lead:
       "Discutez avec les modèles Mistral depuis n'importe quel onglet, avec un badge de consommation de tokens sur l'icône.",
-    about_byok_h: "BYOK — Bring Your Own Key",
-    about_byok_p:
+    help_byok_h: "BYOK — Bring Your Own Key",
+    help_byok_p:
       "Webstral appelle directement l'API Mistral (api.mistral.ai) depuis votre navigateur, avec votre propre clé API. Aucune donnée ne transite par un serveur intermédiaire ; la clé reste stockée localement dans l'extension.",
-    about_usage_h: "Consommation du compte",
-    about_usage_p:
+    help_usage_h: "Consommation du compte",
+    help_usage_p:
       "Connecté sur console.mistral.ai dans ce navigateur, l'extension lit la consommation réelle du compte (cookie de session, aucun mot de passe demandé) et l'affiche sur l'icône et dans la pop-up. Sans session, elle retombe sur un comptage local des tokens passés par Webstral.",
-    about_links_h: "Liens",
-    about_links_keys: "Créer une clé API (La Plateforme)",
-    about_links_sub: "Abonnement (admin.mistral.ai)",
-    about_links_src: "Code source (GitHub scabon/webstral)",
-    about_project_h: "Projet",
-    about_project_p:
+    help_links_h: "Liens",
+    help_links_keys: "Créer une clé API (La Plateforme)",
+    help_links_sub: "Abonnement (admin.mistral.ai)",
+    help_links_src: "Code source (GitHub scabon/webstral)",
+    help_project_h: "Projet",
+    help_project_p:
       "Projet personnel de la famille Cabon14 — compagnon navigateur de Monstral (WearOS). Chrome/Edge (Manifest V3) et Firefox (sidebar). Non publié sur les stores à ce stade.",
+    // à propos (vue À propos, style wagonBAR : site / support / dons)
+    about_tagline:
+      "Extension navigateur pour discuter avec les modèles Mistral, avec un badge de consommation de tokens sur l'icône.",
+    about_note:
+      "Projet personnel, non affilié à Mistral. Vos données restent dans votre navigateur.",
+    made_by: "Créé par :",
+    about_site: "cabon14.com",
+    support_label: "Assistance :",
+    support_email: "support@cabon14.com",
+    donate_title: "Soutenir Webstral",
+    donate_liberapay: "Soutenir sur Liberapay",
+    donate_tipeee: "Pourboire sur Tipeee",
   },
   en: {
     appName: "Webstral",
@@ -106,6 +118,7 @@ const I18N_MESSAGES = {
     menu_changelog: "Changelog",
     menu_about: "About",
     menu_settings: "Settings",
+    menu_help: "Help",
     back: "Back",
     menu_console: "Mistral console",
     menu_subscription: "Subscription (admin)",
@@ -174,22 +187,32 @@ const I18N_MESSAGES = {
     sp_err_no_key_local: "Configure your Mistral API key in the pop-up settings.",
     sp_hint: "Ask Webstral anything.",
     sp_meta: "{in} tokens in, {out} tokens out",
-    about_title: "Webstral — About",
-    about_lead:
+    help_lead:
       "Chat with Mistral models from any tab, with a token-usage badge on the toolbar icon.",
-    about_byok_h: "BYOK — Bring Your Own Key",
-    about_byok_p:
+    help_byok_h: "BYOK — Bring Your Own Key",
+    help_byok_p:
       "Webstral calls the Mistral API (api.mistral.ai) directly from your browser, with your own API key. No data goes through an intermediary server; the key stays stored locally in the extension.",
-    about_usage_h: "Account usage",
-    about_usage_p:
+    help_usage_h: "Account usage",
+    help_usage_p:
       "Signed in to console.mistral.ai in this browser, the extension reads the account's real usage (session cookie, no password asked) and shows it on the icon and in the pop-up. Without a session, it falls back to a local count of tokens sent through Webstral.",
-    about_links_h: "Links",
-    about_links_keys: "Create an API key (La Plateforme)",
-    about_links_sub: "Subscription (admin.mistral.ai)",
-    about_links_src: "Source code (GitHub scabon/webstral)",
-    about_project_h: "Project",
-    about_project_p:
+    help_links_h: "Links",
+    help_links_keys: "Create an API key (La Plateforme)",
+    help_links_sub: "Subscription (admin.mistral.ai)",
+    help_links_src: "Source code (GitHub scabon/webstral)",
+    help_project_h: "Project",
+    help_project_p:
       "Cabon14 family personal project — browser companion of Monstral (WearOS). Chrome/Edge (Manifest V3) and Firefox (sidebar). Not published on stores yet.",
+    about_tagline:
+      "Browser extension to chat with Mistral models, with a token-usage badge on the toolbar icon.",
+    about_note:
+      "Personal project, not affiliated with Mistral. Your data stays in your browser.",
+    made_by: "Made by:",
+    about_site: "cabon14.com",
+    support_label: "Support:",
+    support_email: "support@cabon14.com",
+    donate_title: "Support Webstral",
+    donate_liberapay: "Donate on Liberapay",
+    donate_tipeee: "Tip on Tipeee",
   },
 };
 

@@ -4,6 +4,7 @@
 const $ = (id) => document.getElementById(id);
 
 let t = (k) => k; // remplacé au chargement via getPopupState.lang
+let currentLang = "fr"; // langue résolue (choix de l'URL Tipeee)
 
 const versionEl = $("version");
 const consoLabelEl = $("conso-label");
@@ -40,6 +41,7 @@ const menuEl = $("menu");
 const btnChat = $("btn-chat");
 const btnRefresh = $("btn-refresh");
 const btnSettings = $("btn-settings");
+const btnHelp = $("btn-help");
 const btnChangelog = $("btn-changelog");
 const btnAbout = $("btn-about");
 
@@ -243,9 +245,11 @@ async function load() {
   try {
     const state = await chrome.runtime.sendMessage({ type: "getPopupState" });
     if (chrome.runtime.lastError) throw new Error(chrome.runtime.lastError.message);
-    t = WebstralI18n.makeT(state.lang ?? "fr");
+    currentLang = state.lang ?? "fr";
+    t = WebstralI18n.makeT(currentLang);
     WebstralI18n.applyI18n(document, t);
-    buildAbout(); // contenu dynamique : dépend de la langue résolue
+    buildHelp(); // contenus dynamiques : dépendent de la langue résolue
+    buildAbout();
     WebstralI18n.applyTheme(state.settings?.theme ?? "system");
     document.documentElement.lang = state.lang ?? "fr";
     if (apiKeyInput.value === "") {
@@ -286,14 +290,15 @@ notifyOnResetEl.addEventListener("change", () =>
   saveSettings({ notifyOnReset: notifyOnResetEl.checked })
 );
 
-// Navigation entre les vues (main / réglages / changelog / à propos), comme wagonBAR.
-const VIEWS = ["main", "settings", "changelog", "about"];
+// Navigation entre les vues (main / réglages / aide / changelog / à propos), comme wagonBAR.
+const VIEWS = ["main", "settings", "help", "changelog", "about"];
 
 function showView(name) {
   for (const v of VIEWS) $(`view-${v}`).classList.toggle("hidden", v !== name);
   menuEl.classList.add("hidden");
 }
 btnSettings.addEventListener("click", () => showView("settings"));
+btnHelp.addEventListener("click", () => showView("help"));
 document.querySelectorAll(".btn-back").forEach((b) =>
   b.addEventListener("click", () => showView("main"))
 );
@@ -314,7 +319,63 @@ function buildChangelog() {
 }
 buildChangelog();
 
-// ---------- À propos (contenu i18n, reconstruit à chaque changement de langue) ----------
+// ---------- Aide (contenu i18n, reconstruit à chaque changement de langue) ----------
+
+function buildHelp() {
+  const el = $("helpContent");
+  const frag = document.createDocumentFragment();
+
+  const lead = document.createElement("p");
+  lead.className = "lead";
+  lead.textContent = t("help_lead");
+  frag.append(lead);
+
+  const sections = [
+    ["help_byok_h", "help_byok_p"],
+    ["help_usage_h", "help_usage_p"],
+  ];
+  for (const [hk, pk] of sections) {
+    const h = document.createElement("h3");
+    h.textContent = t(hk);
+    const p = document.createElement("p");
+    p.textContent = t(pk);
+    frag.append(h, p);
+  }
+
+  const linksH = document.createElement("h3");
+  linksH.textContent = t("help_links_h");
+  const links = document.createElement("p");
+  links.className = "links-list";
+  const defs = [
+    ["help_links_keys", "https://console.mistral.ai/api-keys"],
+    ["help_links_sub", "https://admin.mistral.ai/subscription"],
+    ["help_links_src", "https://github.com/scabon/webstral"],
+  ];
+  for (const [k, href] of defs) {
+    const a = document.createElement("a");
+    a.href = href;
+    a.target = "_blank";
+    a.rel = "noreferrer";
+    a.textContent = t(k);
+    links.append(a, document.createElement("br"));
+  }
+  frag.append(linksH, links);
+
+  const projH = document.createElement("h3");
+  projH.textContent = t("help_project_h");
+  const projP = document.createElement("p");
+  projP.textContent = t("help_project_p");
+  frag.append(projH, projP);
+
+  el.replaceChildren(frag);
+}
+
+// ---------- À propos (style wagonBAR : site, support, dons) ----------
+
+const DONATION_LIBERAPAY = "https://liberapay.com/cabon14/";
+// Tipeee sert une UI française sur fr.tipeee.com et anglaise sur en.tipeee.com
+const DONATION_TIPEEE_FR = "https://fr.tipeee.com/cabon14/";
+const DONATION_TIPEEE_EN = "https://en.tipeee.com/cabon14/";
 
 function buildAbout() {
   const el = $("aboutContent");
@@ -330,50 +391,55 @@ function buildAbout() {
   }
   brand.textContent = `${t("appName")}${ver ? ` v${ver}` : ""}`;
 
-  const lead = document.createElement("p");
-  lead.className = "lead";
-  lead.textContent = t("about_lead");
-  frag.append(brand, lead);
+  const tagline = document.createElement("p");
+  tagline.textContent = t("about_tagline");
 
-  const sections = [
-    ["about_byok_h", "about_byok_p"],
-    ["about_usage_h", "about_usage_p"],
-  ];
-  for (const [hk, pk] of sections) {
-    const h = document.createElement("h3");
-    h.textContent = t(hk);
-    const p = document.createElement("p");
-    p.textContent = t(pk);
-    frag.append(h, p);
-  }
+  const note = document.createElement("p");
+  note.className = "about-note";
+  note.textContent = t("about_note");
 
-  const linksH = document.createElement("h3");
-  linksH.textContent = t("about_links_h");
-  const links = document.createElement("p");
-  links.className = "links-list";
-  const defs = [
-    ["about_links_keys", "https://console.mistral.ai/api-keys"],
-    ["about_links_sub", "https://admin.mistral.ai/subscription"],
-    ["about_links_src", "https://github.com/scabon/webstral"],
-  ];
-  for (const [k, href] of defs) {
-    const a = document.createElement("a");
-    a.href = href;
-    a.target = "_blank";
-    a.rel = "noreferrer";
-    a.textContent = t(k);
-    links.append(a, document.createElement("br"));
-  }
-  frag.append(linksH, links);
+  const siteLine = document.createElement("p");
+  siteLine.className = "about-line";
+  const madeBy = document.createElement("span");
+  madeBy.textContent = `${t("made_by")} `;
+  const site = document.createElement("a");
+  site.href = "https://cabon14.com/";
+  site.target = "_blank";
+  site.rel = "noreferrer";
+  site.textContent = t("about_site");
+  siteLine.append(madeBy, site);
 
-  const projH = document.createElement("h3");
-  projH.textContent = t("about_project_h");
-  const projP = document.createElement("p");
-  projP.textContent = t("about_project_p");
-  frag.append(projH, projP);
+  const supportLine = document.createElement("p");
+  supportLine.className = "about-line";
+  const supportLabel = document.createElement("span");
+  supportLabel.textContent = `${t("support_label")} `;
+  const support = document.createElement("a");
+  support.href = `mailto:${t("support_email")}`;
+  support.textContent = t("support_email");
+  supportLine.append(supportLabel, support);
 
+  const donateH = document.createElement("h3");
+  donateH.textContent = t("donate_title");
+  const donateRow = document.createElement("div");
+  donateRow.className = "donate-row";
+  const liberapay = document.createElement("a");
+  liberapay.href = DONATION_LIBERAPAY;
+  liberapay.target = "_blank";
+  liberapay.rel = "noreferrer";
+  liberapay.className = "donate-liberapay";
+  liberapay.textContent = t("donate_liberapay");
+  const tipeee = document.createElement("a");
+  tipeee.href = currentLang === "fr" ? DONATION_TIPEEE_FR : DONATION_TIPEEE_EN;
+  tipeee.target = "_blank";
+  tipeee.rel = "noreferrer";
+  tipeee.className = "donate-tipeee";
+  tipeee.textContent = t("donate_tipeee");
+  donateRow.append(liberapay, tipeee);
+
+  frag.append(brand, tagline, note, siteLine, supportLine, donateH, donateRow);
   el.replaceChildren(frag);
 }
+buildHelp();
 buildAbout();
 
 let keyTimer = null;
