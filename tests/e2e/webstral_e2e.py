@@ -277,6 +277,7 @@ POPUP_MOCK = """
             (document.body.dataset.tabsCreate || "") + "|" + opts.url;
         },
       },
+      windows: { getCurrent: async () => ({ id: 1 }) },
     };
   })();
 </script>
@@ -679,6 +680,7 @@ def main() -> int:
 
         menu = client.execute_script(
             """
+            return (async () => {
             const rb = document.getElementById('btn-refresh');
             const sourceAvant = document.getElementById('conso-source').textContent;
             if (rb) rb.click();
@@ -688,6 +690,7 @@ def main() -> int:
             document.getElementById('btn-chat').click();
             document.getElementById('btn-about').click();
             document.getElementById('btn-options').click();
+            await new Promise((r) => setTimeout(r, 200)); // handlers async (openChat…)
             return {
               visible,
               refreshPresent: !!rb,
@@ -699,6 +702,7 @@ def main() -> int:
               linkConsole: (document.getElementById('link-console') || {}).href || '',
               linkSub: (document.getElementById('link-subscription') || {}).href || '',
             };
+            })();
             """
         )
         time.sleep(0.5)

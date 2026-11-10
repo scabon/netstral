@@ -257,7 +257,13 @@ document.addEventListener("click", (e) => {
 });
 
 btnChat.addEventListener("click", async () => {
-  const res = await chrome.runtime.sendMessage({ type: "openChat" });
+  // la pop-up connaît sa fenêtre : on passe le windowId au background
+  // (un service worker n'a pas de "currentWindow" fiable)
+  const win = await chrome.windows.getCurrent();
+  const res = await chrome.runtime.sendMessage({
+    type: "openChat",
+    windowId: win?.id,
+  });
   if (res?.ok) window.close();
 });
 

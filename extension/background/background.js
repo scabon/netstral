@@ -33,10 +33,14 @@ function resolveLangFor(settings) {
 
 // Le clic sur l'icône ouvre la pop-up (action.default_popup dans le
 // manifest). La pop-up demande l'ouverture du panneau de chat via le
-// message "openChat" : Chrome -> sidePanel.open, Firefox -> sidebarAction.open.
-async function openChatPanel() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  const windowId = tab?.windowId;
+// message "openChat" (avec son windowId) : Chrome -> sidePanel.open,
+// Firefox -> sidebarAction.open. Sans windowId reçu, fallback sur la
+// dernière fenêtre focalisée (un service worker n'a pas de "currentWindow").
+async function openChatPanel(windowId) {
+  if (windowId == null) {
+    const win = await chrome.windows?.getLastFocused?.();
+    windowId = win?.id;
+  }
   if (chrome.sidePanel?.open) {
     await chrome.sidePanel.open({ windowId });
   } else if (chrome.sidebarAction?.open) {
@@ -890,7 +894,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
 
   if (msg.type === "openChat") {
-    openChatPanel()
+    openChatPanel(msg.windowId)
       .then(() => sendResponse({ ok: true }))
       .catch((err) => sendResponse({ ok: false, error: String(err) }));
     return true; // réponse asynchrone

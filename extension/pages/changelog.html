@@ -10,6 +10,18 @@
     <h1>Changelog <span id="version" class="note"></span></h1>
 
     <section>
+      <h2>v0.4.3 — fix « Ouvrir le chat »</h2>
+      <p>
+        Le bouton ne faisait rien : <code>chrome.tabs.query({currentWindow:true})</code>
+        depuis le service worker ne renvoie pas de fenêtre fiable, le
+        <code>windowId</code> partait <code>undefined</code> et
+        <code>sidePanel.open</code> échouait. La pop-up envoie maintenant son
+        propre <code>windowId</code> (<code>chrome.windows.getCurrent</code>),
+        fallback <code>getLastFocused</code> côté background.
+      </p>
+    </section>
+
+    <section>
       <h2>v0.4.2 — bouton refresh dans la pop-up</h2>
       <p>
         Bouton ⟳ à droite de la ligne « lu il y a… » (sous le pourcentage),

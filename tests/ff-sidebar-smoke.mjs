@@ -26,7 +26,7 @@ function makeContext({ withSidePanel }) {
       onMessage: { addListener: (fn) => messageListeners.push(fn) },
       getManifest: () => ({ version: "0.3.0" }),
     },
-    tabs: { query: async () => [{ windowId: 42 }] },
+    windows: { getLastFocused: async () => ({ id: 42 }) },
     sidePanel: withSidePanel
       ? { open: async (opts) => opens.push(["sidePanel", opts]) }
       : undefined,
@@ -64,14 +64,14 @@ function makeContext({ withSidePanel }) {
   return { send, opens };
 }
 
-async function scenario(name, withSidePanel, expectedApi) {
+async function scenario(name, withSidePanel, expectedApi, msg, expectedWindowId) {
   const { send, opens } = makeContext({ withSidePanel });
-  const res = await send({ type: "openChat" });
+  const res = await send(msg);
   const ok =
     res?.ok === true &&
     opens.length === 1 &&
     opens[0][0] === expectedApi &&
-    opens[0][1].windowId === 42;
+    opens[0][1].windowId === expectedWindowId;
   console.log(
     `${ok ? "PASS" : "FAIL"} ${name}: res=${JSON.stringify(res)} opens=${JSON.stringify(opens)}`
   );
@@ -79,8 +79,18 @@ async function scenario(name, withSidePanel, expectedApi) {
 }
 
 const results = [];
-results.push(await scenario("Chrome -> sidePanel.open", true, "sidePanel"));
-results.push(await scenario("Firefox -> sidebarAction.open", false, "sidebar"));
+results.push(
+  await scenario("Chrome, windowId explicite -> sidePanel.open", true, "sidePanel", { type: "openChat", windowId: 7 }, 7)
+);
+results.push(
+  await scenario("Chrome, sans windowId -> getLastFocused (42)", true, "sidePanel", { type: "openChat" }, 42)
+);
+results.push(
+  await scenario("Firefox, windowId explicite -> sidebarAction.open", false, "sidebar", { type: "openChat", windowId: 7 }, 7)
+);
+results.push(
+  await scenario("Firefox, sans windowId -> getLastFocused (42)", false, "sidebar", { type: "openChat" }, 42)
+);
 
 const pass = results.every(Boolean);
 console.log(pass ? "PASS" : "FAIL");
