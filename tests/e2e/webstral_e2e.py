@@ -439,12 +439,19 @@ def main() -> int:
               // navigation : menu ⋮ -> Réglages -> vue settings, retour <- vue main
               r.mainVisible = !document.getElementById('view-main').classList.contains('hidden');
               r.settingsHidden = document.getElementById('view-settings').classList.contains('hidden');
+              // display calculé (régression : #view-* { display:flex } écrasait .hidden)
+              r.mainDisplay = getComputedStyle(document.getElementById('view-main')).display;
+              r.settingsDisplay = getComputedStyle(document.getElementById('view-settings')).display;
               document.getElementById('btn-menu').click();
               document.getElementById('btn-settings').click();
               r.settingsShown = !document.getElementById('view-settings').classList.contains('hidden');
+              r.settingsDisplayShown = getComputedStyle(document.getElementById('view-settings')).display;
+              r.mainDisplaySettings = getComputedStyle(document.getElementById('view-main')).display;
               r.menuClosed = document.getElementById('menu').classList.contains('hidden');
               document.getElementById('btn-back').click();
               r.backToMain = !document.getElementById('view-main').classList.contains('hidden');
+              r.mainDisplayBack = getComputedStyle(document.getElementById('view-main')).display;
+              r.settingsDisplayBack = getComputedStyle(document.getElementById('view-settings')).display;
               const th = document.getElementById('themeSelect');
               th.value = 'dark'; th.dispatchEvent(new Event('change'));
               const lg = document.getElementById('langSelect');
@@ -467,6 +474,12 @@ def main() -> int:
             and disp.get("settingsShown") is True
             and disp.get("menuClosed") is True
             and disp.get("backToMain") is True
+            and disp.get("mainDisplay") == "flex"
+            and disp.get("settingsDisplay") == "none"
+            and disp.get("settingsDisplayShown") == "flex"
+            and disp.get("mainDisplaySettings") == "none"
+            and disp.get("mainDisplayBack") == "flex"
+            and disp.get("settingsDisplayBack") == "none"
             and disp.get("setTitleFr") == "Réglages"
             and disp.get("theme") == "dark"
             and disp.get("setTitleEn") == "Settings"

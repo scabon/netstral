@@ -386,6 +386,12 @@ button.mini:hover {
   gap: 10px;
 }
 
+/* .hidden doit gagner sur le display:flex des vues (spécificité ID) */
+#view-main.hidden,
+#view-settings.hidden {
+  display: none;
+}
+
 .back-row {
   display: flex;
   align-items: center;
