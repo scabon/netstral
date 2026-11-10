@@ -256,16 +256,11 @@ document.addEventListener("click", (e) => {
   if (!menuEl.contains(e.target)) menuEl.classList.add("hidden");
 });
 
-btnChat.addEventListener("click", async () => {
-  // la pop-up connaît sa fenêtre : on passe le windowId au background
-  // (un service worker n'a pas de "currentWindow" fiable)
-  const win = await chrome.windows.getCurrent();
-  const res = await chrome.runtime.sendMessage({
-    type: "openChat",
-    windowId: win?.id,
-  });
-  if (res?.ok) window.close();
-});
+// « Ouvrir le chat » = simple raccourci vers chat.mistral.ai (le chat
+// intégré au side panel existe toujours, mais on ne le réimplémente pas ici).
+btnChat.addEventListener("click", () =>
+  chrome.tabs.create({ url: "https://chat.mistral.ai/" })
+);
 
 btnRefresh.addEventListener("click", async () => {
   btnRefresh.classList.add("spin");

@@ -684,19 +684,20 @@ def main() -> int:
             const rb = document.getElementById('btn-refresh');
             const sourceAvant = document.getElementById('conso-source').textContent;
             if (rb) rb.click();
+            const chatBtn = document.querySelector('header #btn-chat');
+            if (chatBtn) chatBtn.click();
             document.getElementById('btn-menu').click();
             const menu = document.getElementById('menu');
             const visible = menu && !menu.classList.contains('hidden');
-            document.getElementById('btn-chat').click();
             document.getElementById('btn-about').click();
             document.getElementById('btn-options').click();
-            await new Promise((r) => setTimeout(r, 200)); // handlers async (openChat…)
+            await new Promise((r) => setTimeout(r, 200));
             return {
               visible,
+              chatInHeader: !!chatBtn,
               refreshPresent: !!rb,
               refreshCalled: document.body.dataset.refreshBudget || '',
               sourceAvant,
-              openChat: document.body.dataset.openChat || '',
               tabsCreate: document.body.dataset.tabsCreate || '',
               optionsOpened: document.body.dataset.optionsOpened || '',
               linkConsole: (document.getElementById('link-console') || {}).href || '',
@@ -707,14 +708,15 @@ def main() -> int:
         )
         time.sleep(0.5)
         check(
-            "C3: menu pop-up + bouton refresh (hors menu) + 'lu il y a…' + liens en bas",
+            "C3: bouton chat en haut -> chat.mistral.ai, refresh, menu, liens en bas",
             menu
+            and menu["chatInHeader"] is True
+            and "chat.mistral.ai" in menu["tabsCreate"]
             and menu["visible"]
             and menu["refreshPresent"] is True
             and menu["refreshCalled"] == "1"
             and "lu il y a" in menu["sourceAvant"]
             and "Source" not in menu["sourceAvant"]
-            and menu["openChat"] == "1"
             and "pages/about.html" in menu["tabsCreate"]
             and menu["optionsOpened"] == "1"
             and "console.mistral.ai" in menu["linkConsole"]
