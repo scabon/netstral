@@ -1,11 +1,11 @@
-// Webstral - i18n embarqué (fr/en). La langue "system" suit chrome.i18n.getUILanguage().
+// Netstral - i18n embarqué (fr/en). La langue "system" suit chrome.i18n.getUILanguage().
 // Les éléments portant data-flag (selects de langue/thème, style wagonBAR)
 // voient leur texte préfixé par l'emoji du flag.
-// Utilisable en <script> classique (attache globalThis.WebstralI18n) et en test Node (vm).
+// Utilisable en <script> classique (attache globalThis.NetstralI18n) et en test Node (vm).
 
 const I18N_MESSAGES = {
   fr: {
-    appName: "Webstral",
+    appName: "Netstral",
     menu_openChat: "Ouvrir le chat",
     menu_refresh: "Actualiser la conso",
     menu_changelog: "Changelog",
@@ -54,9 +54,9 @@ const I18N_MESSAGES = {
     proj_100_before: "À ce rythme, 100 % atteints dans ~{n} j (avant la réinitialisation)",
     proj_100_after: "À ce rythme, 100 % atteints dans ~{n} j (après la réinitialisation)",
     proj_100_none: "Aucune conso pour l'instant — 100 % hors de portée à ce rythme.",
-    local_title: "Webstral ce mois-ci",
+    local_title: "Netstral ce mois-ci",
     local_tokens: "Tokens (comptage local)",
-    notif_title: "Webstral — consommation à {pct} %",
+    notif_title: "Netstral — consommation à {pct} %",
     notif_body: "{label} : {pct} % du budget consommé ({amount}).",
     // réglages (dans la pop-up)
     set_title: "Réglages",
@@ -68,29 +68,28 @@ const I18N_MESSAGES = {
     set_theme_dark: "Sombre",
     set_lang_label: "Langue",
     set_lang_system: "Système",
-    set_alerts_help: "Notification navigateur quand la consommation franchit le seuil.",
     set_alerts_enabled: "Activer les notifications",
     set_alert_pct_label: "Me notifier à (%)",
     set_notify_reset: "Me notifier à la réinitialisation du quota",
-    notif_reset_title: "Webstral — quota réinitialisé",
+    notif_reset_title: "Netstral — quota réinitialisé",
     notif_reset_body: "Nouveau cycle de facturation : la consommation repart de 0.",
     // sidepanel
-    sp_placeholder: "Message à Webstral… (Entrée pour envoyer, Maj+Entrée pour un saut de ligne)",
+    sp_placeholder: "Message à Netstral… (Entrée pour envoyer, Maj+Entrée pour un saut de ligne)",
     sp_send: "Envoyer",
     sp_new_chat: "Nouvelle conversation",
-    sp_err_no_key: "Aucune clé API configurée. Ouvrez les options de Webstral pour la coller.",
+    sp_err_no_key: "Aucune clé API configurée. Ouvrez les options de Netstral pour la coller.",
     sp_err_no_key_local: "Configurez votre clé API Mistral dans les réglages de la pop-up.",
-    sp_hint: "Posez une question à Webstral.",
+    sp_hint: "Posez une question à Netstral.",
     sp_meta: "{in} tokens in, {out} tokens out",
     // aide (contenu de la vue Aide)
     help_lead:
       "Discutez avec les modèles Mistral depuis n'importe quel onglet, avec un badge de consommation de tokens sur l'icône.",
     help_byok_h: "BYOK — Bring Your Own Key",
     help_byok_p:
-      "Webstral appelle directement l'API Mistral (api.mistral.ai) depuis votre navigateur, avec votre propre clé API. Aucune donnée ne transite par un serveur intermédiaire ; la clé reste stockée localement dans l'extension.",
+      "Netstral appelle directement l'API Mistral (api.mistral.ai) depuis votre navigateur, avec votre propre clé API. Aucune donnée ne transite par un serveur intermédiaire ; la clé reste stockée localement dans l'extension.",
     help_usage_h: "Consommation du compte",
     help_usage_p:
-      "Connecté sur console.mistral.ai dans ce navigateur, l'extension lit la consommation réelle du compte (cookie de session, aucun mot de passe demandé) et l'affiche sur l'icône et dans la pop-up. Sans session, elle retombe sur un comptage local des tokens passés par Webstral.",
+      "Connecté sur console.mistral.ai dans ce navigateur, l'extension lit la consommation réelle du compte (cookie de session, aucun mot de passe demandé) et l'affiche sur l'icône et dans la pop-up. Sans session, elle retombe sur un comptage local des tokens passés par Netstral.",
     help_links_h: "Liens",
     help_links_keys: "Créer une clé API (La Plateforme)",
     help_links_sub: "Abonnement (admin.mistral.ai)",
@@ -107,12 +106,12 @@ const I18N_MESSAGES = {
     about_site: "cabon14.com",
     support_label: "Assistance :",
     support_email: "support@cabon14.com",
-    donate_title: "Soutenir Webstral",
+    donate_title: "Soutenir Netstral",
     donate_liberapay: "Soutenir sur Liberapay",
     donate_tipeee: "Pourboire sur Tipeee",
   },
   en: {
-    appName: "Webstral",
+    appName: "Netstral",
     menu_openChat: "Open chat",
     menu_refresh: "Refresh usage",
     menu_changelog: "Changelog",
@@ -161,9 +160,9 @@ const I18N_MESSAGES = {
     proj_100_before: "At this rate, 100 % reached in ~{n} d (before reset)",
     proj_100_after: "At this rate, 100 % reached in ~{n} d (after reset)",
     proj_100_none: "No usage yet — 100 % out of reach at this rate.",
-    local_title: "Webstral this month",
+    local_title: "Netstral this month",
     local_tokens: "Tokens (local count)",
-    notif_title: "Webstral — usage at {pct} %",
+    notif_title: "Netstral — usage at {pct} %",
     notif_body: "{label}: {pct} % of the budget used ({amount}).",
     set_title: "Settings",
     set_key_label: "Mistral API key",
@@ -174,27 +173,26 @@ const I18N_MESSAGES = {
     set_theme_dark: "Dark",
     set_lang_label: "Language",
     set_lang_system: "System",
-    set_alerts_help: "Browser notification when usage crosses the threshold.",
     set_alerts_enabled: "Enable notifications",
     set_alert_pct_label: "Notify me at (%)",
     set_notify_reset: "Notify me when the quota resets",
-    notif_reset_title: "Webstral — quota reset",
+    notif_reset_title: "Netstral — quota reset",
     notif_reset_body: "New billing cycle: usage is back to 0.",
-    sp_placeholder: "Message to Webstral… (Enter to send, Shift+Enter for a new line)",
+    sp_placeholder: "Message to Netstral… (Enter to send, Shift+Enter for a new line)",
     sp_send: "Send",
     sp_new_chat: "New conversation",
-    sp_err_no_key: "No API key configured. Open Webstral's settings to paste it.",
+    sp_err_no_key: "No API key configured. Open Netstral's settings to paste it.",
     sp_err_no_key_local: "Configure your Mistral API key in the pop-up settings.",
-    sp_hint: "Ask Webstral anything.",
+    sp_hint: "Ask Netstral anything.",
     sp_meta: "{in} tokens in, {out} tokens out",
     help_lead:
       "Chat with Mistral models from any tab, with a token-usage badge on the toolbar icon.",
     help_byok_h: "BYOK — Bring Your Own Key",
     help_byok_p:
-      "Webstral calls the Mistral API (api.mistral.ai) directly from your browser, with your own API key. No data goes through an intermediary server; the key stays stored locally in the extension.",
+      "Netstral calls the Mistral API (api.mistral.ai) directly from your browser, with your own API key. No data goes through an intermediary server; the key stays stored locally in the extension.",
     help_usage_h: "Account usage",
     help_usage_p:
-      "Signed in to console.mistral.ai in this browser, the extension reads the account's real usage (session cookie, no password asked) and shows it on the icon and in the pop-up. Without a session, it falls back to a local count of tokens sent through Webstral.",
+      "Signed in to console.mistral.ai in this browser, the extension reads the account's real usage (session cookie, no password asked) and shows it on the icon and in the pop-up. Without a session, it falls back to a local count of tokens sent through Netstral.",
     help_links_h: "Links",
     help_links_keys: "Create an API key (La Plateforme)",
     help_links_sub: "Subscription (admin.mistral.ai)",
@@ -210,7 +208,7 @@ const I18N_MESSAGES = {
     about_site: "cabon14.com",
     support_label: "Support:",
     support_email: "support@cabon14.com",
-    donate_title: "Support Webstral",
+    donate_title: "Support Netstral",
     donate_liberapay: "Donate on Liberapay",
     donate_tipeee: "Tip on Tipeee",
   },
@@ -264,5 +262,5 @@ function applyTheme(theme) {
 }
 
 if (typeof globalThis !== "undefined") {
-  globalThis.WebstralI18n = { I18N_MESSAGES, resolveLang, makeT, applyI18n, applyTheme };
+  globalThis.NetstralI18n = { I18N_MESSAGES, resolveLang, makeT, applyI18n, applyTheme };
 }

@@ -1,16 +1,16 @@
-// Webstral - UI du side panel : chat, streaming, markdown minimal.
+// Netstral - UI du side panel : chat, streaming, markdown minimal.
 
 let t = (k) => k; // remplacé au boot via settings.lang
 
 async function bootI18n() {
   const { settings } = await chrome.storage.local.get("settings");
-  const lang = WebstralI18n.resolveLang(
+  const lang = NetstralI18n.resolveLang(
     settings?.lang,
     chrome.i18n?.getUILanguage?.() ?? "fr-FR"
   );
-  t = WebstralI18n.makeT(lang);
-  WebstralI18n.applyI18n(document, t);
-  WebstralI18n.applyTheme(settings?.theme ?? "system");
+  t = NetstralI18n.makeT(lang);
+  NetstralI18n.applyI18n(document, t);
+  NetstralI18n.applyTheme(settings?.theme ?? "system");
   document.documentElement.lang = lang;
 }
 
@@ -184,7 +184,7 @@ async function saveConversation() {
 
 function ensurePort() {
   if (port) return port;
-  port = chrome.runtime.connect({ name: "webstral-chat" });
+  port = chrome.runtime.connect({ name: "netstral-chat" });
   port.onMessage.addListener((msg) => {
     if (msg.type === "delta") {
       const last = conversation[conversation.length - 1];

@@ -109,7 +109,7 @@ const context = vm.createContext({
 vm.runInContext(readFileSync(new URL("../extension/i18n.js", import.meta.url), "utf8") + "\n" + code, context);
 
 const portMock = {
-  name: "webstral-chat",
+  name: "netstral-chat",
   onMessage: { addListener: (fn) => (portMock._onMessage = fn) },
   postMessage: (m) => sent.push(m),
 };

@@ -1,11 +1,11 @@
-// Webstral - service worker MV3
+// Netstral - service worker MV3
 // Gère les appels API Mistral (chat en streaming SSE) et relaie les tokens
 // vers le side panel via un port de longue durée.
 
 const API_BASE = "https://api.mistral.ai/v1";
 
 // i18n embarqué : via background.scripts (Firefox) ou importScripts (Chrome MV3)
-if (typeof WebstralI18n === "undefined" && typeof importScripts === "function") {
+if (typeof NetstralI18n === "undefined" && typeof importScripts === "function") {
   try {
     importScripts("i18n.js");
   } catch (err) {
@@ -15,40 +15,25 @@ if (typeof WebstralI18n === "undefined" && typeof importScripts === "function") 
 
 // Traducteur pour la langue demandée (settings.lang: system|fr|en).
 function tFor(settings) {
-  if (typeof WebstralI18n === "undefined") return (k) => k;
-  const lang = WebstralI18n.resolveLang(
+  if (typeof NetstralI18n === "undefined") return (k) => k;
+  const lang = NetstralI18n.resolveLang(
     settings?.lang,
     chrome.i18n?.getUILanguage?.() ?? "fr-FR"
   );
-  return WebstralI18n.makeT(lang);
+  return NetstralI18n.makeT(lang);
 }
 
 function resolveLangFor(settings) {
-  if (typeof WebstralI18n === "undefined") return "fr";
-  return WebstralI18n.resolveLang(
+  if (typeof NetstralI18n === "undefined") return "fr";
+  return NetstralI18n.resolveLang(
     settings?.lang,
     chrome.i18n?.getUILanguage?.() ?? "fr-FR"
   );
 }
 
-// Le clic sur l'icône ouvre la pop-up (action.default_popup dans le
-// manifest). La pop-up demande l'ouverture du panneau de chat via le
-// message "openChat" (avec son windowId) : Chrome -> sidePanel.open,
-// Firefox -> sidebarAction.open. Sans windowId reçu, fallback sur la
-// dernière fenêtre focalisée (un service worker n'a pas de "currentWindow").
-async function openChatPanel(windowId) {
-  if (windowId == null) {
-    const win = await chrome.windows?.getLastFocused?.();
-    windowId = win?.id;
-  }
-  if (chrome.sidePanel?.open) {
-    await chrome.sidePanel.open({ windowId });
-  } else if (chrome.sidebarAction?.open) {
-    await chrome.sidebarAction.open({ windowId });
-  } else {
-    throw new Error("API sidePanel/sidebarAction indisponible.");
-  }
-}
+// Le clic sur l'icône ouvre la pop-up (action.default_popup dans le manifest).
+// Le chat ne passe plus par le side panel depuis la pop-up (bouton 💬 ->
+// chat.mistral.ai) ; la sidebar reste ouvrable depuis le menu du navigateur.
 
 chrome.runtime.onInstalled.addListener(() => {
   ensureBudgetAlarm();
@@ -98,7 +83,7 @@ const BUDGET_URL =
   "https://admin.mistral.ai/api/local-trpc/billing.budget?input=" +
   encodeURIComponent('{"json":null,"meta":{"values":["undefined"],"v":1}}');
 const BUDGET_TTL_MS = 60 * 60 * 1000; // 1 h
-const BUDGET_ALARM = "webstral-budget-refresh";
+const BUDGET_ALARM = "netstral-budget-refresh";
 
 async function fetchJsonWithSession(url) {
   const ctrl = new AbortController();
@@ -186,124 +171,6 @@ function safePreview(data) {
   }
 }
 
-// ---------- Diagnostic console ----------
-// Sonne les endpoints candidats avec la session : statut + aperçu du corps.
-// Sert à cartographier la vraie API console (non documentée) en un clic.
-
-async function fetchSessionText(url, maxLen = 700) {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 15000);
-  let response;
-  try {
-    response = await fetch(url, {
-      credentials: "include",
-      signal: ctrl.signal,
-    });
-  } catch (err) {
-    return { status: 0, error: `Réseau : ${err.message}` };
-  } finally {
-    clearTimeout(timer);
-  }
-  let text = "";
-  try {
-    text = await response.text();
-    if (maxLen != null && text.length > maxLen) text = text.slice(0, maxLen);
-  } catch {
-    text = "<corps illisible>";
-  }
-  return {
-    status: response.status,
-    redirected: response.redirected ? response.url : null,
-    text,
-  };
-}
-
-function consoleProbeUrls() {
-  const now = new Date();
-  const start = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-  const end = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-  return [
-    "https://console.mistral.ai/api/billing/credits",
-    "https://console.mistral.ai/api/users/organizations",
-    "https://console.mistral.ai/api/v1/usage",
-    `https://console.mistral.ai/api/v1/usage?start_date=${start}&end_date=${end}`,
-    `https://console.mistral.ai/api/v1/usage/monthly?start_date=${start}&end_date=${end}`,
-    "https://console.mistral.ai/api/v1/billing/usage",
-    "https://console.mistral.ai/api/v1/billing/overview",
-    "https://console.mistral.ai/api/v1/billing",
-    "https://console.mistral.ai/api/usage/summary",
-    "https://console.mistral.ai/api/billing/overview",
-  ];
-}
-
-// Extrait tous les chemins d'API cités dans un texte de bundle JS.
-// 3 stratégies (le code minifié ne cite les procédures tRPC que via des
-// chaînes de propriétés, sans guillemets) :
-// 1. littéraux "/api/..." ;
-// 2. littéraux "billing.x.y" ;
-// 3. chaînes de propriétés devant .useQuery/.useMutation/.query/.mutate
-//    (ex. trpc.billing.budget.useQuery) — le premier segment (nom du client
-//    minifié) est retiré.
-function extractApiPaths(text) {
-  const found = new Set();
-  let m;
-  const re = /["'`](\/(?:api|trpc|local-trpc)\/[A-Za-z0-9\-_/.{}$]{2,120})["'`]/g;
-  while ((m = re.exec(text)) !== null) found.add(m[1]);
-  const tre = /["'`](billing\.[A-Za-z0-9\-.]{2,60})["'`]/g;
-  while ((m = tre.exec(text)) !== null) found.add(`local-trpc:${m[1]}`);
-  const chainRe =
-    /\b([A-Za-z0-9_$][A-Za-z0-9_$-]*(?:\.[A-Za-z0-9_$][A-Za-z0-9_$-]*){1,4})\.(?:useQuery|useMutation|useSuspenseQuery|query|mutate)\s*\(/g;
-  while ((m = chainRe.exec(text)) !== null) {
-    const segs = m[1].split(".");
-    if (segs.length < 2) continue;
-    const proc = segs.slice(1).join(".");
-    if (/^[a-z]/.test(proc)) found.add(`local-trpc:${proc}`);
-  }
-  return [...found];
-}
-
-// Scan d'un frontend avec la session : récupère les pages, en extrait les
-// bundles JS et collecte tous les chemins d'API qu'ils citent.
-async function scanFrontendPages(routes) {
-  const scriptUrls = new Set();
-  const apiPaths = new Set();
-  for (const route of routes) {
-    const page = await fetchSessionText(route, 20000);
-    if (!page.text || !page.text.includes("<script")) continue;
-    const srcRe = /<script[^>]+src="([^"]+)"/g;
-    let m;
-    while ((m = srcRe.exec(page.text)) !== null) {
-      let src = m[1];
-      if (!src.startsWith("http")) {
-        const origin = new URL(route).origin;
-        src = src.startsWith("/") ? origin + src : route + "/" + src;
-      }
-      if (src.endsWith(".js")) scriptUrls.add(src);
-    }
-    for (const p of extractApiPaths(page.text)) apiPaths.add(p);
-  }
-  const bundles = [...scriptUrls].slice(0, 15);
-  for (const url of bundles) {
-    const js = await fetchSessionText(url, null); // bundles analysés en entier
-    for (const p of extractApiPaths(js.text)) apiPaths.add(p);
-  }
-  return { routes: routes.length, bundles: bundles.length, apiPaths: [...apiPaths].sort() };
-}
-
-// Sonde les procédures local-trpc découvertes avec l'input null que l'app
-// admin utilise, et renvoie statut + aperçu.
-async function probeLocalTrpcProcedures(procedures, origin) {
-  const nullInput = encodeURIComponent(
-    '{"json":null,"meta":{"values":["undefined"],"v":1}}'
-  );
-  const out = [];
-  for (const proc of procedures.slice(0, 15)) {
-    const url = `${origin}/api/local-trpc/${proc}?input=${nullInput}`;
-    const r = await fetchSessionText(url, 500);
-    out.push({ proc, status: r.status, redirected: r.redirected, text: r.text });
-  }
-  return out;
-}
 // Allocation de l'abonnement (Vibe Pro) — secondaire.
 // Réponse réelle (2026-11-09, sonnées via diagnostic) :
 //   { ..., api_budget: {usage_percentage, initial_budget, currency, reset_at},
@@ -515,7 +382,7 @@ function badgeColor(pct, settings) {
 // 1. plan Vibe (admin billing.budget.vibe_budget — la page /subscription) ;
 // 2. allocation API incluse dans l'abonnement (api_budget) ;
 // 3. crédits PAYG de la console (wallet non nul) ;
-// 4. comptage local « tokens passés par Webstral » vs budget de tokens.
+// 4. comptage local « tokens passés par Netstral » vs budget de tokens.
 // mode "account" = source 1-3, mode "local" = source 4, mode "none" = rien.
 async function computeBadgeState() {
   const settings = await getSettings();
@@ -587,14 +454,14 @@ async function updateBadge() {
         ? ` (${state.spent} ${state.currency} / ${state.total} ${state.currency})`
         : "";
     await chrome.action.setTitle({
-      title: `Webstral — ${t(state.labelKey)} : ${state.pct}%${amount}`,
+      title: `Netstral — ${t(state.labelKey)} : ${state.pct}%${amount}`,
     });
     await chrome.action.setBadgeBackgroundColor({ color: state.color });
     await chrome.action.setBadgeText({ text: `${state.pct}%` });
     await maybeNotify(state, settings);
     return;
   }
-  await chrome.action.setTitle({ title: "Webstral" });
+  await chrome.action.setTitle({ title: "Netstral" });
   await chrome.action.setBadgeText({ text: "" });
 }
 
@@ -830,7 +697,7 @@ async function streamChat(port, apiKey, { model, messages }) {
 // ---------- Ports (side panel) ----------
 
 chrome.runtime.onConnect.addListener((port) => {
-  if (port.name !== "webstral-chat") return;
+  if (port.name !== "netstral-chat") return;
 
   port.onMessage.addListener(async (msg) => {
     if (msg.type !== "chat") return;
@@ -844,86 +711,7 @@ chrome.runtime.onConnect.addListener((port) => {
   });
 });
 
-// ---------- Messages simples (options page) ----------
-
-const KNOWN_TRPC_PROCEDURES = [
-  "billing.budget",
-  "billing.info",
-  "billing.usageLimits",
-  "billing.subscriptions.current",
-  "billing.subscriptions.list",
-  "billing.subscription",
-  "billing.credits",
-  "billing.usage",
-  "billing.payg",
-  "billing.overview",
-];
-
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-// Procédures local-trpc de la famille billing, connues du
-// reverse-engineering public (openchamber #1630) : sondées directement,
-// sans attendre le scan des bundles.
-
-
-  if (msg.type === "probeConsole") {
-    (async () => {
-      // 1. endpoints console candidats (session cookie)
-      const results = [];
-      for (const url of consoleProbeUrls()) {
-        results.push(await fetchSessionText(url));
-      }
-
-      // 2. sondage direct des procédures local-trpc connues (admin host)
-      const adminProbes = await probeLocalTrpcProcedures(
-        KNOWN_TRPC_PROCEDURES,
-        "https://admin.mistral.ai"
-      );
-
-      // 3. scan du frontend admin avec la nouvelle extraction ; toute
-      // procédure découverte en plus des connues est sondée à son tour.
-      let adminScan = null;
-      try {
-        adminScan = await scanFrontendPages([
-          "https://admin.mistral.ai/subscription",
-          "https://admin.mistral.ai/",
-        ]);
-        const found = adminScan.apiPaths
-          .filter((p) => p.startsWith("local-trpc:"))
-          .map((p) => p.slice("local-trpc:".length))
-          .filter((p) => !KNOWN_TRPC_PROCEDURES.includes(p));
-        adminScan.procedures = found;
-        for (const p of found.slice(0, 5)) {
-          const r = await probeLocalTrpcProcedures([p], "https://admin.mistral.ai");
-          adminProbes.push(...r);
-        }
-      } catch (err) {
-        adminScan = { error: String(err) };
-      }
-
-      // 4. scan du frontend console (pour la route du chat / clés)
-      let consoleScan = null;
-      try {
-        consoleScan = await scanFrontendPages([
-          "https://console.mistral.ai/",
-          "https://console.mistral.ai/usage",
-          "https://console.mistral.ai/billing",
-        ]);
-      } catch (err) {
-        consoleScan = { error: String(err) };
-      }
-
-      sendResponse({ probes: results, adminScan, adminProbes, consoleScan });
-    })();
-    return true; // réponse asynchrone
-  }
-
-  if (msg.type === "openChat") {
-    openChatPanel(msg.windowId)
-      .then(() => sendResponse({ ok: true }))
-      .catch((err) => sendResponse({ ok: false, error: String(err) }));
-    return true; // réponse asynchrone
-  }
-
   if (msg.type === "getPopupState") {
     getPopupState()
       .then(sendResponse)
@@ -944,36 +732,5 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       .then(sendResponse);
     return true; // réponse asynchrone
   }
-
-  if (msg.type !== "listModels") return false;
-
-  (async () => {
-    const apiKey = await getApiKey();
-    if (!apiKey) {
-      sendResponse({ ok: false, error: "Aucune clé API configurée." });
-      return;
-    }
-    try {
-      const res = await fetch(`${API_BASE}/models`, {
-        headers: { Authorization: `Bearer ${apiKey}` },
-      });
-      if (!res.ok) {
-        sendResponse({
-          ok: false,
-          error: `Mistral API : ${res.status} ${res.statusText}`,
-        });
-        return;
-      }
-      const body = await res.json();
-      const models = (body.data ?? [])
-        .map((m) => m.id)
-        .sort((a, b) => a.localeCompare(b));
-      await chrome.storage.local.set({ models });
-      sendResponse({ ok: true, models });
-    } catch (err) {
-      sendResponse({ ok: false, error: `Réseau : ${err.message}` });
-    }
-  })();
-
-  return true; // réponse asynchrone
 });
+

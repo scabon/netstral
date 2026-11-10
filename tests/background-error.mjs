@@ -52,7 +52,7 @@ const context = vm.createContext({
 vm.runInContext(readFileSync(new URL("../extension/i18n.js", import.meta.url), "utf8") + "\n" + code, context);
 
 const port = {
-  name: "webstral-chat",
+  name: "netstral-chat",
   onMessage: { addListener: (fn) => (port._onMessage = fn) },
   postMessage: (m) => sent.push(m),
 };

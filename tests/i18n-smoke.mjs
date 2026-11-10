@@ -10,7 +10,7 @@ const code = readFileSync(
 );
 const context = vm.createContext({ globalThis: {}, console });
 vm.runInContext(code, context);
-const { resolveLang, makeT, I18N_MESSAGES } = context.globalThis.WebstralI18n;
+const { resolveLang, makeT, I18N_MESSAGES } = context.globalThis.NetstralI18n;
 
 const results = [];
 const check = (name, ok, extra = "") => {

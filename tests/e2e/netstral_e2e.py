@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Webstral e2e on Firefox Dev Edition (headless, Marionette).
+"""Netstral e2e on Firefox Dev Edition (headless, Marionette).
 
 Suit la recette schatzy projects/firefox-marionette-e2e.md (harness wagonBAR) :
 env MOZ_REMOTE_ALLOW_SYSTEM_ACCESS, badge lu via le nœud toolbar "-BAP",
@@ -10,14 +10,14 @@ Phases :
   A. build xpi + install temporaire -> le manifest MV3 (sidebar_action +
      background.scripts) charge, uuid résoluble.
   B. storage.js seedé (settings + usage) -> badge « 15% » (comptage local) ;
-     clic sur l'icône -> pop-up (default_popup) ; bouton « Ouvrir le chat »
-     de la pop-up -> message openChat -> sidebarAction.open.
+     clic sur l'icône -> pop-up (default_popup) ; la sidebar s'ouvre à
+     l'installation (sidebar_action.open_at_install).
   C. copie localhost du sidepanel (chrome mock) : streaming + markdown + meta.
   C2. copie localhost de la pop-up : réglages (thème dark, langue EN avec
       drapeaux, alertes, clé API pré-remplie).
   C3. copie localhost de la pop-up (chrome mock) : rendu conso/projection/menu.
 
-Usage : python tests/e2e/webstral_e2e.py
+Usage : python tests/e2e/netstral_e2e.py
 MISTRAL_API_KEY (optionnel) est juste seedé comme clé de chat (jamais affiché).
 """
 import functools
@@ -41,7 +41,7 @@ from marionette_driver.marionette import Marionette
 
 ROOT = Path(__file__).resolve().parents[2]
 EXT_DIR = ROOT / "extension"
-ADDON_ID = "webstral@cabon14.com"
+ADDON_ID = "netstral@cabon14.com"
 FF_BINARY = Path(os.environ["ProgramFiles"]) / "Firefox Developer Edition" / "firefox.exe"
 PORT = 2828
 HTTP_PORT = 8973
@@ -75,7 +75,7 @@ def build_xpi(dest: Path) -> None:
 
 def make_profile(dest: Path) -> Path:
     dest.mkdir(parents=True, exist_ok=True)
-    widget = "webstral_cabon14_com"
+    widget = "netstral_cabon14_com"
     ui_state = json.dumps({"placements": {"nav-bar": [f"{widget}-browser-action"]}})
     (dest / "user.js").write_text(
         'user_pref("browser.shell.checkDefaultBrowser", false);\n'
@@ -196,7 +196,7 @@ POPUP_MOCK = """
         lang: s.lang ?? "system", theme: s.theme ?? "system",
         alertsEnabled: s.alertsEnabled !== false, alertPct: s.alertPct ?? 90, notifyOnReset: s.notifyOnReset !== false,
       };
-      state.lang = WebstralI18n.resolveLang(s.lang, "fr-FR");
+      state.lang = NetstralI18n.resolveLang(s.lang, "fr-FR");
       state.hasApiKey = Boolean(store.apiKey);
     }
     refreshLang();
@@ -283,9 +283,9 @@ def build_srv(srv_dir: Path) -> None:
 
 
 def main() -> int:
-    tmp = Path(tempfile.mkdtemp(prefix="webstral_e2e_"))
+    tmp = Path(tempfile.mkdtemp(prefix="netstral_e2e_"))
     profile_dir = make_profile(tmp / "profile")
-    xpi = tmp / "webstral.xpi"
+    xpi = tmp / "netstral.xpi"
     srv_dir = tmp / "srv"
     build_xpi(xpi)
     seed_storage(profile_dir)
@@ -340,7 +340,7 @@ def main() -> int:
         for _ in range(20):
             badge = chrome_script(
                 """
-                const b = win.document.getElementById('webstral_cabon14_com-BAP');
+                const b = win.document.getElementById('netstral_cabon14_com-BAP');
                 return b ? b.getAttribute('badge') : null;
                 """
             )
@@ -364,9 +364,7 @@ def main() -> int:
         # - manifest embarqué : action.default_popup (check ci-dessus, Python) ;
         # - la sidebar de l'extension s'ouvre à l'installation
         #   (sidebar_action.open_at_install) ;
-        # - le flux « openChat -> sidebarAction.open » du vrai background est
-        #   couvert par tests/ff-sidebar-smoke.mjs, et le rendu/boutons de la
-        #   pop-up par la phase C3 ci-dessous.
+        # - le rendu/boutons de la pop-up par la phase C3 ci-dessous.
         after = chrome_script(
             """
             const box = win.document.getElementById('sidebar-box');
@@ -523,8 +521,8 @@ def main() -> int:
             and disp.get("changelogDisplay") == "flex"
             and disp.get("mainDisplayChangelog") == "none"
             and disp.get("settingsDisplayChangelog") == "none"
-            and disp.get("changelogEntries", 0) >= 21
-            and disp.get("changelogTop", "").startswith("v0.5.4")
+            and disp.get("changelogEntries") == 0
+            and disp.get("changelogTop") == ""
             and disp.get("backFromChangelog") is True
             and disp.get("changelogDisplayBack") == "none"
             and disp.get("menuIcons") == 4

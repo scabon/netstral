@@ -1,12 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "Webstral",
-  "version": "0.5.4",
+  "name": "Netstral",
+  "version": "1.0",
   "description": "Discutez avec les modèles Mistral depuis n'importe quel onglet, avec suivi de consommation de tokens.",
   "minimum_chrome_version": "116",
   "browser_specific_settings": {
     "gecko": {
-      "id": "webstral@cabon14.com",
+      "id": "netstral@cabon14.com",
       "strict_min_version": "127.0"
     }
   },
@@ -17,14 +17,14 @@
     "128": "icons/icon-128.png"
   },
   "action": {
-    "default_title": "Webstral",
+    "default_title": "Netstral",
     "default_popup": "popup/popup.html"
   },
   "side_panel": {
     "default_path": "sidepanel/sidepanel.html"
   },
   "sidebar_action": {
-    "default_title": "Webstral",
+    "default_title": "Netstral",
     "default_panel": "sidepanel/sidepanel.html",
     "default_icon": {
       "16": "icons/icon-16.png",

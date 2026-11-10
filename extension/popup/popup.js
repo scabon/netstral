@@ -1,4 +1,4 @@
-// Webstral - pop-up de l'icône : conso (même % que le badge), infos compte,
+// Netstral - pop-up de l'icône : conso (même % que le badge), infos compte,
 // projection, réglages (langue/thème/alertes/clé API) et menu.
 
 const $ = (id) => document.getElementById(id);
@@ -246,11 +246,11 @@ async function load() {
     const state = await chrome.runtime.sendMessage({ type: "getPopupState" });
     if (chrome.runtime.lastError) throw new Error(chrome.runtime.lastError.message);
     currentLang = state.lang ?? "fr";
-    t = WebstralI18n.makeT(currentLang);
-    WebstralI18n.applyI18n(document, t);
+    t = NetstralI18n.makeT(currentLang);
+    NetstralI18n.applyI18n(document, t);
     buildHelp(); // contenus dynamiques : dépendent de la langue résolue
     buildAbout();
-    WebstralI18n.applyTheme(state.settings?.theme ?? "system");
+    NetstralI18n.applyTheme(state.settings?.theme ?? "system");
     document.documentElement.lang = state.lang ?? "fr";
     if (apiKeyInput.value === "") {
       const { apiKey } = await chrome.storage.local.get("apiKey");
@@ -271,7 +271,7 @@ async function saveSettings(patch) {
 
 themeSelect.addEventListener("change", async () => {
   await saveSettings({ theme: themeSelect.value });
-  WebstralI18n.applyTheme(themeSelect.value);
+  NetstralI18n.applyTheme(themeSelect.value);
 });
 
 langSelect.addEventListener("change", async () => {
@@ -308,7 +308,7 @@ document.querySelectorAll(".btn-back").forEach((b) =>
 function buildChangelog() {
   const el = $("changelogContent");
   const frag = document.createDocumentFragment();
-  for (const entry of window.WebstralChangelog ?? []) {
+  for (const entry of window.NetstralChangelog ?? []) {
     const h = document.createElement("h3");
     h.textContent = entry.h;
     const p = document.createElement("p");
