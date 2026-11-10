@@ -220,6 +220,14 @@ POPUP_MOCK = """
         spentTokens: 150, budgetTokens: 1000,
       };
     }
+    // #nokey : pas de clé API + plan non reconnu (masquages + bouton config)
+    if (location.hash === "#nokey") {
+      state.hasApiKey = false;
+      state.account.subscriptionPlan = {
+        fetchedAt: Date.now(), plan: null, planRaw: null, planPath: null,
+        source: "admin-trpc:billing.subscriptions.current", rawPreview: "{}",
+      };
+    }
     window.chrome = {
       storage: {
         local: { get: async () => ({}), set: async () => {} },
@@ -334,12 +342,17 @@ def main() -> int:
                 """
             )
 
-        badge = chrome_script(
-            """
-            const b = win.document.getElementById('webstral_cabon14_com-BAP');
-            return b ? b.getAttribute('badge') : null;
-            """
-        )
+        badge = None
+        for _ in range(20):
+            badge = chrome_script(
+                """
+                const b = win.document.getElementById('webstral_cabon14_com-BAP');
+                return b ? b.getAttribute('badge') : null;
+                """
+            )
+            if badge:
+                break
+            time.sleep(0.5)
         check("B: badge = 15% (comptage local seed)", badge == "15%", repr(badge))
 
         # Le manifest embarqué (xpi buildé depuis extension/) doit déclarer
@@ -460,28 +473,31 @@ def main() -> int:
               bg: fill.style.background,
               detail: document.getElementById('conso-detail').textContent,
               plan: document.getElementById('acc-plan').textContent,
+              planRowHidden: document.getElementById('plan-row').classList.contains('hidden'),
               wallet: document.getElementById('acc-wallet').textContent,
               reset: document.getElementById('acc-reset').textContent,
-              key: document.getElementById('acc-key').textContent,
+              resetIn: document.getElementById('acc-reset-in').textContent,
+              keyRowHidden: document.getElementById('key-row').classList.contains('hidden'),
               errHidden: document.getElementById('acc-error').classList.contains('hidden'),
               localHidden: document.querySelector('section.local').classList.contains('hidden'),
             };
             """
         )
         check(
-            "C3: pop-up rend conso (21%) + compte (Pro) ; local masqué, pas d'erreur rouge",
+            "C3: pop-up rend conso (21%) + plan Pro + reset dans Xj ; BYOK masquée, local masqué",
             pop
             and pop["version"] == "v0.3.0-test"
             and pop["pct"].replace(" ", "").replace("\u202f", "").replace("\u00a0", "") == "21%"
             and pop["width"] == "21%"
             and "26" in pop["bg"]  # rgb(26, 127, 55) = #1a7f37
             and "255" in pop["detail"]
-            and pop["plan"] == "Pro"
+            and pop["plan"] == "Pro" and pop["planRowHidden"] is False
             and pop["reset"] == "2026-12-01"  # yyyy-MM-dd
-            and pop["key"] == "configurée"
+            and "dans" in pop["resetIn"] and "jour" in pop["resetIn"]
+            and pop["keyRowHidden"] is True  # clé configurée -> ligne BYOK masquée
             and pop["errHidden"] is True   # source compte OK -> pas d'erreur de session
             and pop["localHidden"] is True,  # comptage local masqué avec source compte
-            json.dumps(pop, ensure_ascii=False)[:200],
+            json.dumps(pop, ensure_ascii=False)[:220],
         )
 
         # C3b : repli comptage local (#local) -> section local visible.
@@ -510,6 +526,30 @@ def main() -> int:
             and norm(pop_local["tokens"]) == "15",
             json.dumps(pop_local, ensure_ascii=False)[:200],
         )
+        # C3c : #nokey -> plan masqué, bouton « Configurer la clé API » -> options
+        client.navigate(f"http://127.0.0.1:{HTTP_PORT}/options/options.html")
+        time.sleep(0.4)
+        client.navigate(f"http://127.0.0.1:{HTTP_PORT}/popup/popup.html#nokey")
+        time.sleep(0.8)
+        nokey = client.execute_script(
+            """
+            document.getElementById('btn-config-key').click();
+            return {
+              planRowHidden: document.getElementById('plan-row').classList.contains('hidden'),
+              keyRowHidden: document.getElementById('key-row').classList.contains('hidden'),
+              optionsOpened: document.body.dataset.optionsOpened || '',
+            };
+            """
+        )
+        check(
+            "C3c: sans clé -> bouton config (ouvre options) ; type de plan masqué",
+            nokey
+            and nokey["planRowHidden"] is True
+            and nokey["keyRowHidden"] is False
+            and nokey["optionsOpened"] == "1",
+            json.dumps(nokey, ensure_ascii=False)[:200],
+        )
+
         menu = client.execute_script(
             """
             document.getElementById('btn-menu').click();

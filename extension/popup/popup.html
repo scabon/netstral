@@ -33,12 +33,12 @@
 
     <section class="account">
       <h2>Compte Mistral</h2>
-      <div class="kv"><span>Type de plan</span><strong id="acc-plan">—</strong></div>
+      <div class="kv hidden" id="plan-row"><span>Type de plan</span><strong id="acc-plan">—</strong></div>
       <div class="kv"><span>Crédits PAYG</span><strong id="acc-wallet">—</strong></div>
       <div class="kv"><span>Réinitialisation</span><strong id="acc-reset">—</strong></div>
-      <div class="kv"><span>Clé API (BYOK)</span><strong id="acc-key">—</strong></div>
+      <div id="acc-reset-in" class="note right hidden"></div>
+      <div class="kv hidden" id="key-row"><span>Clé API (BYOK)</span><button id="btn-config-key" class="mini">Configurer la clé API</button></div>
       <div id="acc-error" class="error hidden"></div>
-      <div id="acc-updated" class="note"></div>
     </section>
 
     <section class="local">

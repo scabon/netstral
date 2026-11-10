@@ -9,12 +9,14 @@ const consoPctEl = $("conso-pct");
 const barFillEl = $("bar-fill");
 const consoDetailEl = $("conso-detail");
 const consoSourceEl = $("conso-source");
+const planRowEl = $("plan-row");
 const accPlanEl = $("acc-plan");
 const accWalletEl = $("acc-wallet");
 const accResetEl = $("acc-reset");
-const accKeyEl = $("acc-key");
+const accResetInEl = $("acc-reset-in");
+const keyRowEl = $("key-row");
+const btnConfigKey = $("btn-config-key");
 const accErrorEl = $("acc-error");
-const accUpdatedEl = $("acc-updated");
 const localTokensEl = $("local-tokens");
 
 const btnMenu = $("btn-menu");
@@ -94,13 +96,14 @@ function render(state) {
   document.querySelector("section.local").classList.toggle("hidden", b?.mode === "account");
 
   const acc = state.account ?? {};
+  // Type de plan : affiché seulement si une valeur a été reconnue — tant que
+  // le mapping de billing.subscriptions.* n'est pas confirmé, on masque.
   const plan = acc.subscriptionPlan;
   if (plan?.plan) {
     accPlanEl.textContent = PLAN_LABELS[plan.plan] ?? plan.planRaw ?? plan.plan;
-  } else if (plan?.planRaw) {
-    accPlanEl.textContent = plan.planRaw;
+    planRowEl.classList.remove("hidden");
   } else {
-    accPlanEl.textContent = "Inconnu";
+    planRowEl.classList.add("hidden");
   }
 
   const credits = acc.consoleCredits;
@@ -113,8 +116,20 @@ function render(state) {
     accWalletEl.textContent = "—";
   }
 
-  accResetEl.textContent = b?.resetAt ? fmtDate(b.resetAt) : "—";
-  accKeyEl.textContent = state.hasApiKey ? "configurée" : "non configurée";
+  if (b?.resetAt) {
+    accResetEl.textContent = fmtDate(b.resetAt);
+    const days = Math.ceil((Date.parse(b.resetAt) - Date.now()) / 86400000);
+    accResetInEl.textContent =
+      days > 1 ? `dans ${days} jours` : days === 1 ? "demain" : "aujourd'hui";
+    accResetInEl.classList.remove("hidden");
+  } else {
+    accResetEl.textContent = "—";
+    accResetInEl.classList.add("hidden");
+  }
+
+  // BYOK : rien à afficher si la clé est configurée ; sinon bouton vers
+  // les paramètres.
+  keyRowEl.classList.toggle("hidden", Boolean(state.hasApiKey));
 
   // Erreur de session affichée seulement si AUCUNE source compte n'est
   // disponible : une sonde du plan qui échoue (HTTP 404…) ne doit pas
@@ -138,11 +153,6 @@ function render(state) {
   } else {
     accErrorEl.classList.add("hidden");
   }
-
-  const fetched = [credits?.fetchedAt, acc.accountBudget?.fetchedAt, plan?.fetchedAt].filter(Boolean);
-  accUpdatedEl.textContent = fetched.length
-    ? `Compte lu ${ilYA(Math.max(...fetched))}.`
-    : "";
 
   // --- Usage local ---
   const u = state.localUsage;
@@ -181,6 +191,7 @@ btnRefresh.addEventListener("click", async () => {
 });
 
 btnOptions.addEventListener("click", () => chrome.runtime.openOptionsPage());
+btnConfigKey.addEventListener("click", () => chrome.runtime.openOptionsPage());
 btnChangelog.addEventListener("click", () =>
   chrome.tabs.create({ url: chrome.runtime.getURL("pages/changelog.html") })
 );

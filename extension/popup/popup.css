@@ -163,6 +163,25 @@ h2 {
   text-align: right;
 }
 
+.note.right {
+  text-align: right;
+  margin-top: -2px;
+}
+
+button.mini {
+  border: none;
+  background: #ff7a3c;
+  color: #fff;
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+button.mini:hover {
+  background: #e56a2f;
+}
+
 .error {
   background: #fdecea;
   color: #b3261e;
