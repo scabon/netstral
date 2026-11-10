@@ -25,7 +25,6 @@ const chatEl = document.getElementById("chat");
 const promptEl = document.getElementById("prompt");
 const btnSend = document.getElementById("btn-send");
 const btnNew = document.getElementById("btn-new");
-const btnOptions = document.getElementById("btn-options");
 const modelSelect = document.getElementById("model-select");
 const errorBanner = document.getElementById("error-banner");
 
@@ -286,8 +285,6 @@ btnNew.addEventListener("click", async () => {
   renderConversation();
   clearError();
 });
-
-btnOptions.addEventListener("click", () => chrome.runtime.openOptionsPage());
 
 modelSelect.addEventListener("change", () => {
   chrome.storage.local.set({ defaultModel: modelSelect.value });

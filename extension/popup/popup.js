@@ -1,5 +1,5 @@
 // Webstral - pop-up de l'icône : conso (même % que le badge), infos compte,
-// projection, menu (chat / liens / actualiser / paramètres / changelog / about).
+// projection, réglages (langue/thème/alertes/clé API) et menu.
 
 const $ = (id) => document.getElementById(id);
 
@@ -16,8 +16,6 @@ const accPlanEl = $("acc-plan");
 const accWalletEl = $("acc-wallet");
 const accResetEl = $("acc-reset");
 const accResetInEl = $("acc-reset-in");
-const keyRowEl = $("key-row");
-const btnConfigKey = $("btn-config-key");
 const accErrorEl = $("acc-error");
 const localTokensEl = $("local-tokens");
 const projEl = $("projection");
@@ -29,11 +27,17 @@ const projMarkLabelEl = $("proj-mark-label");
 const projRateEl = $("proj-rate");
 const proj100El = $("proj-100");
 
+const themeSelect = $("themeSelect");
+const langSelect = $("langSelect");
+const alertsEnabledEl = $("alertsEnabled");
+const alertPctInput = $("alertPct");
+const apiKeyInput = $("apiKey");
+const btnToggleKey = $("btnToggleKey");
+
 const btnMenu = $("btn-menu");
 const menuEl = $("menu");
 const btnChat = $("btn-chat");
 const btnRefresh = $("btn-refresh");
-const btnOptions = $("btn-options");
 const btnChangelog = $("btn-changelog");
 const btnAbout = $("btn-about");
 
@@ -95,15 +99,11 @@ function renderProjection(b) {
   const scaleMax = Math.max(100, Math.ceil(p.endPct / 10) * 10);
   const x = (v) => `${Math.min(100, (v / scaleMax) * 100)}%`;
 
-  // zone hachurée au-delà de 100 %
   projOver100El.style.left = x(100);
   projOver100El.style.width = p.endPct > 100 ? x(scaleMax - 100) : "0%";
-  // consommé actuel (couleur du badge)
   projFillEl.style.width = x(b.pct);
   projFillEl.style.background = b.color ?? "#1a7f37";
-  // tick 100 %
   projTick100El.style.left = x(100);
-  // marqueur de fin de période
   projMarkEl.style.left = x(p.endPct);
   projMarkLabelEl.style.left = x(p.endPct);
   projMarkLabelEl.textContent = `~${Math.round(p.endPct)} %`;
@@ -203,13 +203,8 @@ function render(state) {
     accResetInEl.classList.add("hidden");
   }
 
-  // BYOK : rien à afficher si la clé est configurée ; sinon bouton vers
-  // les paramètres.
-  keyRowEl.classList.toggle("hidden", Boolean(state.hasApiKey));
-
   // Erreur de session affichée seulement si AUCUNE source compte n'est
-  // disponible : une sonde du plan qui échoue (HTTP 404…) ne doit pas
-  // afficher « connectez-vous » quand le budget du compte est bien lu.
+  // disponible.
   const hasAccountSource = b?.mode === "account";
   const err = hasAccountSource
     ? null
@@ -232,6 +227,13 @@ function render(state) {
   // --- Usage local ---
   const u = state.localUsage;
   localTokensEl.textContent = u ? fmtTokens(u.total_tokens) : "—";
+
+  // --- Réglages (pré-remplis depuis le state) ---
+  const s = state.settings ?? {};
+  themeSelect.value = s.theme ?? "system";
+  langSelect.value = s.lang ?? "system";
+  alertsEnabledEl.checked = s.alertsEnabled !== false;
+  alertPctInput.value = s.alertPct ?? 90;
 }
 
 async function load() {
@@ -241,13 +243,55 @@ async function load() {
     t = WebstralI18n.makeT(state.lang ?? "fr");
     WebstralI18n.applyI18n(document, t);
     WebstralI18n.applyTheme(state.settings?.theme ?? "system");
+    document.documentElement.lang = state.lang ?? "fr";
+    if (apiKeyInput.value === "") {
+      const { apiKey } = await chrome.storage.local.get("apiKey");
+      apiKeyInput.value = apiKey ?? "";
+    }
     render(state);
   } catch (err) {
     consoDetailEl.textContent = `${t("err_prefix")} ${err.message}`;
   }
 }
 
-// --- Menu ---
+// ---------- Réglages ----------
+
+async function saveSettings(patch) {
+  const { settings: prev = {} } = await chrome.storage.local.get("settings");
+  await chrome.storage.local.set({ settings: { ...prev, ...patch } });
+}
+
+themeSelect.addEventListener("change", async () => {
+  await saveSettings({ theme: themeSelect.value });
+  WebstralI18n.applyTheme(themeSelect.value);
+});
+
+langSelect.addEventListener("change", async () => {
+  await saveSettings({ lang: langSelect.value });
+  await load(); // re-lit la langue résolue et réapplique les textes
+});
+
+alertsEnabledEl.addEventListener("change", () =>
+  saveSettings({ alertsEnabled: alertsEnabledEl.checked })
+);
+alertPctInput.addEventListener("input", () => {
+  const v = Math.min(100, Math.max(1, Number(alertPctInput.value) || 90));
+  saveSettings({ alertPct: v });
+});
+
+let keyTimer = null;
+apiKeyInput.addEventListener("input", () => {
+  clearTimeout(keyTimer);
+  keyTimer = setTimeout(() => {
+    chrome.storage.local.set({ apiKey: apiKeyInput.value.trim() });
+  }, 400);
+});
+btnToggleKey.addEventListener("click", () => {
+  apiKeyInput.type = apiKeyInput.type === "password" ? "text" : "password";
+});
+
+// ---------- Header / menu ----------
+
 btnMenu.addEventListener("click", (e) => {
   e.stopPropagation();
   menuEl.classList.toggle("hidden");
@@ -256,8 +300,7 @@ document.addEventListener("click", (e) => {
   if (!menuEl.contains(e.target)) menuEl.classList.add("hidden");
 });
 
-// « Ouvrir le chat » = simple raccourci vers chat.mistral.ai (le chat
-// intégré au side panel existe toujours, mais on ne le réimplémente pas ici).
+// « Ouvrir le chat » = simple raccourci vers chat.mistral.ai.
 btnChat.addEventListener("click", () =>
   chrome.tabs.create({ url: "https://chat.mistral.ai/" })
 );
@@ -273,11 +316,6 @@ btnRefresh.addEventListener("click", async () => {
   }
 });
 
-// Liens rapides console/admin : de simples ancres <a target="_blank"> en bas
-// de la pop-up (footer .links), rien à câbler ici.
-
-btnOptions.addEventListener("click", () => chrome.runtime.openOptionsPage());
-btnConfigKey.addEventListener("click", () => chrome.runtime.openOptionsPage());
 btnChangelog.addEventListener("click", () =>
   chrome.tabs.create({ url: chrome.runtime.getURL("pages/changelog.html") })
 );
@@ -285,7 +323,7 @@ btnAbout.addEventListener("click", () =>
   chrome.tabs.create({ url: chrome.runtime.getURL("pages/about.html") })
 );
 
-// Rafraîchit en direct quand le badge/les données/langue/thème bougent.
+// Rafraîchit en direct quand le badge/les données/les réglages bougent.
 chrome.storage.onChanged.addListener((changes, area) => {
   if (
     area === "local" &&
@@ -293,7 +331,8 @@ chrome.storage.onChanged.addListener((changes, area) => {
       changes.consoleCredits ||
       changes.accountBudget ||
       changes.subscriptionPlan ||
-      changes.settings)
+      changes.settings ||
+      changes.apiKey)
   ) {
     load();
   }

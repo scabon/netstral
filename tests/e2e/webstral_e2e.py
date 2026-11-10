@@ -13,9 +13,9 @@ Phases :
      clic sur l'icône -> pop-up (default_popup) ; bouton « Ouvrir le chat »
      de la pop-up -> message openChat -> sidebarAction.open.
   C. copie localhost du sidepanel (chrome mock) : streaming + markdown + meta.
-  C2. copie localhost des options : bouton permissions (visible sans grant,
-      disparaît après accord).
-  C3. copie localhost de la pop-up (chrome mock) : rendu conso/compte/menu.
+  C2. copie localhost de la pop-up : réglages (thème dark, langue EN avec
+      drapeaux, alertes, clé API pré-remplie).
+  C3. copie localhost de la pop-up (chrome mock) : rendu conso/projection/menu.
 
 Usage : python tests/e2e/webstral_e2e.py
 MISTRAL_API_KEY (optionnel) est juste seedé comme clé de chat (jamais affiché).
@@ -161,58 +161,22 @@ SIDEPANEL_MOCK = """
 </script>
 """
 
-OPTIONS_MOCK = """
-<script>
-  // Compteurs via le DOM ( monde isolé Marionette : window.* invisibles )
-  (function () {
-    window.__permGranted = { v: false };
-    const store = {}; // persistant : bootI18n relit settings après chaque set
-    window.chrome = {
-      storage: {
-        local: {
-          get: async (k) => {
-            const want = Array.isArray(k) ? k : [k];
-            const out = {};
-            for (const key of want) if (key in store) out[key] = store[key];
-            return typeof k === "string" ? { [k]: store[k] } : out;
-          },
-          set: async (o) => Object.assign(store, o),
-        },
-        onChanged: { addListener: () => {} },
-      },
-      runtime: {
-        sendMessage: (m, cb) =>
-          setTimeout(() => cb({ accountBudget: null, accountBudgetError: 'session absente (mock)' }), 10),
-        openOptionsPage: () => {},
-      },
-      permissions: {
-        contains: async () => window.__permGranted.v,
-        request: async () => {
-          window.__permGranted.v = true;
-          const b = document.getElementById('btn-perms');
-          b.dataset.requests = String((parseInt(b.dataset.requests || '0', 10) || 0) + 1);
-          return true;
-        },
-      },
-    };
-  })();
-</script>
-"""
-
 POPUP_MOCK = """
 <script>
   // Réponses via le DOM (monde isolé Marionette : window.* invisibles).
+  // storage persistant : les réglages écrits par la pop-up sont relus au load.
   (function () {
+    const store = { apiKey: "test-key" };
     const state = {
       ok: true,
-      version: "0.3.0-test",
+      version: "0.5.0-test",
       lang: "fr",
       badge: {
-        mode: "account", source: "admin-budget", label: "plan Vibe",
+        mode: "account", source: "admin-budget", label: "plan Vibe", labelKey: "badge_plan_vibe",
         pct: 21, color: "#1a7f37", spent: 53.55, total: 255, currency: "EUR",
         resetAt: "2026-12-01T00:00:00Z", fetchedAt: Date.now() - 5 * 60000,
       },
-      settings: { warnPct: 70, dangerPct: 90, monthlyBudgetTokens: null },
+      settings: { warnPct: 70, dangerPct: 90, monthlyBudgetTokens: null, lang: "system", theme: "system", alertsEnabled: true, alertPct: 90 },
       account: {
         consoleCredits: { fetchedAt: Date.now(), total: 100, spent: 40, currency: "EUR" },
         consoleCreditsError: null,
@@ -225,51 +189,61 @@ POPUP_MOCK = """
       hasApiKey: true,
       modelCount: 3,
     };
-    // #local : bascule le badge en comptage local (pour tester l'affichage repli)
+    function refreshLang() {
+      const s = store.settings || {};
+      state.settings = {
+        warnPct: 70, dangerPct: 90, monthlyBudgetTokens: null,
+        lang: s.lang ?? "system", theme: s.theme ?? "system",
+        alertsEnabled: s.alertsEnabled !== false, alertPct: s.alertPct ?? 90,
+      };
+      state.lang = WebstralI18n.resolveLang(s.lang, "fr-FR");
+      state.hasApiKey = Boolean(store.apiKey);
+    }
+    refreshLang();
+    // #local : badge en comptage local ; #over : projection > 100 % ;
+    // #nokey : pas de clé API + plan non reconnu.
     if (location.hash === "#local") {
+      state.badge = { mode: "local", label: "comptage local", labelKey: "badge_local", pct: 15, color: "#1a7f37", spentTokens: 150, budgetTokens: 1000 };
+    }
+    if (location.hash === "#over") {
       state.badge = {
-        mode: "local", label: "comptage local", pct: 15, color: "#1a7f37",
-        spentTokens: 150, budgetTokens: 1000,
+        mode: "account", source: "admin-budget", label: "plan Vibe", labelKey: "badge_plan_vibe",
+        pct: 95, color: "#b3261e", spent: 242.25, total: 255, currency: "EUR",
+        resetAt: new Date(Date.now() + 5 * 86400000).toISOString(), fetchedAt: Date.now(),
       };
     }
-    // #nokey : pas de clé API + plan non reconnu (masquages + bouton config)
     if (location.hash === "#nokey") {
-      state.hasApiKey = false;
+      store.apiKey = "";
       state.account.subscriptionPlan = {
         fetchedAt: Date.now(), plan: null, planRaw: null, planPath: null,
         source: "admin-trpc:billing.subscriptions.current", rawPreview: "{}",
       };
-    }
-    // #over : conso à 95 % avec réinit dans 5 j -> projection > 100 %
-    if (location.hash === "#over") {
-      state.badge = {
-        mode: "account", source: "admin-budget", label: "plan Vibe",
-        pct: 95, color: "#b3261e", spent: 242.25, total: 255, currency: "EUR",
-        resetAt: new Date(Date.now() + 5 * 86400000).toISOString(),
-        fetchedAt: Date.now(),
-      };
+      refreshLang();
     }
     window.chrome = {
       storage: {
-        local: { get: async () => ({}), set: async () => {} },
+        local: {
+          get: async (k) => {
+            const want = Array.isArray(k) ? k : [k];
+            const out = {};
+            for (const key of want) if (key in store) out[key] = store[key];
+            return typeof k === "string" ? { [k]: store[k] } : out;
+          },
+          set: async (o) => { Object.assign(store, o); refreshLang(); },
+        },
         onChanged: { addListener: () => {} },
       },
       runtime: {
-        getManifest: () => ({ version: "0.3.0-test" }),
+        getManifest: () => ({ version: "0.5.0-test" }),
         getURL: (p) => p,
         sendMessage: (m) => {
           if (m.type === "getPopupState") return Promise.resolve(state);
-          if (m.type === "openChat") {
-            document.body.dataset.openChat = "1";
-            return Promise.resolve({ ok: true });
-          }
           if (m.type === "refreshBudget") {
             document.body.dataset.refreshBudget = "1";
             return Promise.resolve({});
           }
           return Promise.resolve({});
         },
-        openOptionsPage: () => { document.body.dataset.optionsOpened = "1"; },
       },
       tabs: {
         create: (opts) => {
@@ -287,22 +261,15 @@ POPUP_MOCK = """
 def build_srv(srv_dir: Path) -> None:
     srv_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy(EXT_DIR / "i18n.js", srv_dir / "i18n.js")
+    shutil.copy(EXT_DIR / "shared.css", srv_dir / "shared.css")
     shutil.copytree(EXT_DIR / "sidepanel", srv_dir / "sidepanel")
-    shutil.copytree(EXT_DIR / "options", srv_dir / "options")
     shutil.copytree(EXT_DIR / "popup", srv_dir / "popup")
+    shutil.copytree(EXT_DIR / "pages", srv_dir / "pages")
     sp = (srv_dir / "sidepanel" / "sidepanel.html").read_text(encoding="utf-8")
     (srv_dir / "sidepanel" / "sidepanel.html").write_text(
         sp.replace(
             '<script type="module" src="sidepanel.js"></script>',
             SIDEPANEL_MOCK + '<script type="module" src="sidepanel.js"></script>',
-        ),
-        encoding="utf-8",
-    )
-    op = (srv_dir / "options" / "options.html").read_text(encoding="utf-8")
-    (srv_dir / "options" / "options.html").write_text(
-        op.replace(
-            '<script type="module" src="options.js"></script>',
-            OPTIONS_MOCK + '<script type="module" src="options.js"></script>',
         ),
         encoding="utf-8",
     )
@@ -456,72 +423,50 @@ def main() -> int:
             json.dumps(sp, ensure_ascii=False)[:160],
         )
 
-        # ---- Phase C2 : copie localhost options (permissions mock)
-        client.navigate(f"http://127.0.0.1:{HTTP_PORT}/options/options.html")
+        # ---- Phase C2 : réglages dans la pop-up (thème/langue/alertes/clé)
+        client.navigate(f"http://127.0.0.1:{HTTP_PORT}/popup/popup.html")
         time.sleep(0.8)
-        opt = client.execute_script(
-            """
-            const view = document.getElementById('perm-view');
-            const btn = document.getElementById('btn-perms');
-            const visible = btn && !btn.classList.contains('hidden');
-            if (btn) btn.click();
-            return { view: view ? view.textContent : null, buttonVisible: visible };
-            """
-        )
-        time.sleep(0.5)
-        opt_after = client.execute_script(
-            """
-            return {
-              view: document.getElementById('perm-view').textContent,
-              buttonHidden: document.getElementById('btn-perms').classList.contains('hidden'),
-              permsRequested: parseInt(document.getElementById('btn-perms').dataset.requests || '0', 10),
-            };
-            """
-        )
-        check(
-            "C2: bouton permissions (visible sans accord, masqué après)",
-            opt is not None
-            and opt.get("buttonVisible")
-            and opt_after.get("permsRequested") == 1
-            and opt_after.get("buttonHidden")
-            and "accordé" in (opt_after.get("view") or ""),
-            json.dumps(opt_after, ensure_ascii=False)[:160],
-        )
-
-        # ---- Phase C2b : langue + thème + alertes dans les options
         disp = client.execute_script(
             """
-            const theme = document.getElementById('theme');
-            theme.value = 'dark';
-            theme.dispatchEvent(new Event('change'));
-            const lang = document.getElementById('lang');
-            lang.value = 'en';
-            lang.dispatchEvent(new Event('change'));
-            return { themeAvant: document.documentElement.dataset.theme };
-            """
-        )
-        time.sleep(0.6)
-        disp_after = client.execute_script(
-            """
-            return {
-              theme: document.documentElement.dataset.theme,
-              testBtn: document.getElementById('btn-test').textContent,
-              alerts: document.getElementById('alerts-enabled').checked,
-              alertPct: String(document.getElementById('alert-pct').value),
-            };
+            return (async () => {
+              const r = {};
+              r.themeAvant = document.documentElement.dataset.theme;
+              r.setTitleFr = document.querySelector('.settings h2').textContent;
+              r.keyFilled = document.getElementById('apiKey').value !== '';
+              r.alerts = document.getElementById('alertsEnabled').checked;
+              r.alertPct = String(document.getElementById('alertPct').value);
+              const th = document.getElementById('themeSelect');
+              th.value = 'dark'; th.dispatchEvent(new Event('change'));
+              const lg = document.getElementById('langSelect');
+              lg.value = 'en'; lg.dispatchEvent(new Event('change'));
+              await new Promise((res) => setTimeout(res, 400));
+              r.theme = document.documentElement.dataset.theme;
+              r.setTitleEn = document.querySelector('.settings h2').textContent;
+              r.langVal = document.getElementById('langSelect').value;
+              r.flagTheme = (document.querySelector('#themeSelect option[value="dark"]') || {}).textContent || '';
+              r.flagLang = (document.querySelector('#langSelect option[value="fr"]') || {}).textContent || '';
+              return r;
+            })();
             """
         )
         check(
-            "C2b: thème dark + langue EN appliqués, case alertes cochée à 90%",
+            "C2: réglages pop-up — dark + EN appliqués, drapeaux, alertes 90%, clé pré-remplie",
             disp is not None
-            and disp_after.get("theme") == "dark"
-            and disp_after.get("testBtn") == "Test connection and load models"
-            and disp_after.get("alerts") is True
-            and disp_after.get("alertPct") == "90",
-            json.dumps(disp_after, ensure_ascii=False)[:200],
+            and disp.get("setTitleFr") == "Réglages"
+            and disp.get("theme") == "dark"
+            and disp.get("setTitleEn") == "Settings"
+            and disp.get("langVal") == "en"
+            and "🌙" in disp.get("flagTheme", "")
+            and "🇫🇷" in disp.get("flagLang", "")
+            and disp.get("alerts") is True
+            and disp.get("alertPct") == "90"
+            and disp.get("keyFilled") is True,
+            json.dumps(disp, ensure_ascii=False)[:240],
         )
 
         # ---- Phase C3 : copie localhost de la pop-up (chrome mock)
+        client.navigate(f"http://127.0.0.1:{HTTP_PORT}/sidepanel/sidepanel.html")
+        time.sleep(0.4)
         client.navigate(f"http://127.0.0.1:{HTTP_PORT}/popup/popup.html")
         time.sleep(0.8)
         pop = client.execute_script(
@@ -538,7 +483,6 @@ def main() -> int:
               wallet: document.getElementById('acc-wallet').textContent,
               reset: document.getElementById('acc-reset').textContent,
               resetIn: document.getElementById('acc-reset-in').textContent,
-              keyRowHidden: document.getElementById('key-row').classList.contains('hidden'),
               errHidden: document.getElementById('acc-error').classList.contains('hidden'),
               localHidden: document.querySelector('section.local').classList.contains('hidden'),
               projHidden: document.getElementById('projection').classList.contains('hidden'),
@@ -562,9 +506,9 @@ def main() -> int:
         end_pct = round(rate * period)
         d100 = round((100 - 21) / rate)
         check(
-            "C3: pop-up rend conso (21%) + plan Pro + reset dans Xj ; BYOK masquée, local masqué",
+            "C3: pop-up rend conso (21%) + plan Pro + reset dans Xj + projection ; local masqué",
             pop
-            and pop["version"] == "v0.3.0-test"
+            and pop["version"] == "v0.5.0-test"
             and pop["pct"].replace(" ", "").replace("\u202f", "").replace("\u00a0", "") == "21%"
             and pop["width"] == "21%"
             and "26" in pop["bg"]  # rgb(26, 127, 55) = #1a7f37
@@ -572,7 +516,6 @@ def main() -> int:
             and pop["plan"] == "Pro" and pop["planRowHidden"] is False
             and pop["reset"] == "2026-12-01"  # yyyy-MM-dd
             and "dans" in pop["resetIn"] and "jour" in pop["resetIn"]
-            and pop["keyRowHidden"] is True  # clé configurée -> ligne BYOK masquée
             and pop["errHidden"] is True   # source compte OK -> pas d'erreur de session
             and pop["localHidden"] is True  # comptage local masqué avec source compte
             and pop["projHidden"] is False
@@ -654,27 +597,26 @@ def main() -> int:
             and "100 %" in over["proj100"],
             json.dumps(over, ensure_ascii=False)[:220],
         )
-        # C3c : #nokey -> plan masqué, bouton « Configurer la clé API » -> options
-        client.navigate(f"http://127.0.0.1:{HTTP_PORT}/options/options.html")
+        # C3c : #nokey -> plan masqué, champ clé API vide dans les réglages
+        client.navigate(f"http://127.0.0.1:{HTTP_PORT}/sidepanel/sidepanel.html")
         time.sleep(0.4)
         client.navigate(f"http://127.0.0.1:{HTTP_PORT}/popup/popup.html#nokey")
         time.sleep(0.8)
         nokey = client.execute_script(
             """
-            document.getElementById('btn-config-key').click();
             return {
               planRowHidden: document.getElementById('plan-row').classList.contains('hidden'),
-              keyRowHidden: document.getElementById('key-row').classList.contains('hidden'),
-              optionsOpened: document.body.dataset.optionsOpened || '',
+              keyEmpty: document.getElementById('apiKey').value === '',
+              settingsVisible: !document.querySelector('section.settings').classList.contains('hidden'),
             };
             """
         )
         check(
-            "C3c: sans clé -> bouton config (ouvre options) ; type de plan masqué",
+            "C3c: sans clé -> champ clé API vide dans les réglages ; type de plan masqué",
             nokey
             and nokey["planRowHidden"] is True
-            and nokey["keyRowHidden"] is False
-            and nokey["optionsOpened"] == "1",
+            and nokey["keyEmpty"] is True
+            and nokey["settingsVisible"] is True,
             json.dumps(nokey, ensure_ascii=False)[:200],
         )
 
@@ -690,7 +632,6 @@ def main() -> int:
             const menu = document.getElementById('menu');
             const visible = menu && !menu.classList.contains('hidden');
             document.getElementById('btn-about').click();
-            document.getElementById('btn-options').click();
             await new Promise((r) => setTimeout(r, 200));
             return {
               visible,
@@ -699,7 +640,6 @@ def main() -> int:
               refreshCalled: document.body.dataset.refreshBudget || '',
               sourceAvant,
               tabsCreate: document.body.dataset.tabsCreate || '',
-              optionsOpened: document.body.dataset.optionsOpened || '',
               linkConsole: (document.getElementById('link-console') || {}).href || '',
               linkSub: (document.getElementById('link-subscription') || {}).href || '',
             };
@@ -718,7 +658,6 @@ def main() -> int:
             and "lu il y a" in menu["sourceAvant"]
             and "Source" not in menu["sourceAvant"]
             and "pages/about.html" in menu["tabsCreate"]
-            and menu["optionsOpened"] == "1"
             and "console.mistral.ai" in menu["linkConsole"]
             and "admin.mistral.ai/subscription" in menu["linkSub"],
             json.dumps(menu, ensure_ascii=False)[:260],
