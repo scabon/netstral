@@ -230,6 +230,15 @@ POPUP_MOCK = """
         source: "admin-trpc:billing.subscriptions.current", rawPreview: "{}",
       };
     }
+    // #over : conso à 95 % avec réinit dans 5 j -> projection > 100 %
+    if (location.hash === "#over") {
+      state.badge = {
+        mode: "account", source: "admin-budget", label: "plan Vibe",
+        pct: 95, color: "#b3261e", spent: 242.25, total: 255, currency: "EUR",
+        resetAt: new Date(Date.now() + 5 * 86400000).toISOString(),
+        fetchedAt: Date.now(),
+      };
+    }
     window.chrome = {
       storage: {
         local: { get: async () => ({}), set: async () => {} },
@@ -484,8 +493,12 @@ def main() -> int:
               localHidden: document.querySelector('section.local').classList.contains('hidden'),
               projHidden: document.getElementById('projection').classList.contains('hidden'),
               projRate: document.getElementById('proj-rate').textContent,
-              projEnd: document.getElementById('proj-end').textContent,
               proj100: document.getElementById('proj-100').textContent,
+              markLabel: document.getElementById('proj-mark-label').textContent,
+              markOver: document.getElementById('proj-mark-label').classList.contains('over'),
+              fillWidth: document.getElementById('proj-fill').style.width,
+              overWidth: document.getElementById('proj-over100').style.width,
+              tickLeft: document.getElementById('proj-tick100').style.left,
             };
             """
         )
@@ -514,11 +527,14 @@ def main() -> int:
             and pop["localHidden"] is True  # comptage local masqué avec source compte
             and pop["projHidden"] is False
             and "%/jour" in pop["projRate"]
-            and f"~{end_pct} %" in pop["projEnd"]
-            and f"dans {days_left} j" in pop["projEnd"]
+            and f"dans {days_left} j" in pop["projRate"]
+            and pop["markLabel"] == f"~{end_pct} %" and pop["markOver"] is False
+            and pop["fillWidth"] == "21%"      # 21% de l'échelle 0-100
+            and pop["tickLeft"] == "100%"      # tick 100 % à droite (échelle = 100)
+            and pop["overWidth"] == "0%"       # projection < 100 % -> pas de zone hachurée
             and "100 %" in pop["proj100"] and f"~{d100} j" in pop["proj100"],
             json.dumps(pop, ensure_ascii=False)[:220]
-            + f" | attendu: end~{end_pct}% dans {days_left}j, 100% dans ~{d100}j",
+            + f" | attendu: mark ~{end_pct}%, dans {days_left}j, 100% dans ~{d100}j",
         )
 
         # C3b : repli comptage local (#local) -> section local visible.
@@ -535,21 +551,58 @@ def main() -> int:
               localHidden: document.querySelector('section.local').classList.contains('hidden'),
               tokens: document.getElementById('local-tokens').textContent,
               projHidden: document.getElementById('projection').classList.contains('hidden'),
-              projEnd: document.getElementById('proj-end').textContent,
+              markLabel: document.getElementById('proj-mark-label').textContent,
+              fillWidth: document.getElementById('proj-fill').style.width,
             };
             """
         )
         norm = lambda s: (s or "").replace(" ", "").replace("\u202f", "").replace("\u00a0", "")
         check(
-            "C3b: repli local -> 15%, 150/1000 tokens, section local visible, projection mois calendaire",
+            "C3b: repli local -> 15%, 150/1000 tokens, section local visible, projection graphique",
             pop_local
             and norm(pop_local["pct"]) == "15%"
             and "150" in pop_local["detail"] and "1000" in norm(pop_local["detail"])
             and pop_local["localHidden"] is False
             and norm(pop_local["tokens"]) == "15"
             and pop_local["projHidden"] is False
-            and "Fin de période" in pop_local["projEnd"],
+            and pop_local["markLabel"].startswith("~") and pop_local["markLabel"].endswith(" %")
+            and pop_local["fillWidth"] == "15%",
             json.dumps(pop_local, ensure_ascii=False)[:200],
+        )
+
+        # C3d : #over -> projection > 100 % : zone hachurée, marqueur rouge
+        client.navigate(f"http://127.0.0.1:{HTTP_PORT}/options/options.html")
+        time.sleep(0.4)
+        client.navigate(f"http://127.0.0.1:{HTTP_PORT}/popup/popup.html#over")
+        time.sleep(0.8)
+        over = client.execute_script(
+            """
+            const fill = document.getElementById('proj-fill');
+            return {
+              pct: document.getElementById('conso-pct').textContent,
+              markLabel: document.getElementById('proj-mark-label').textContent,
+              markOver: document.getElementById('proj-mark-label').classList.contains('over'),
+              fillWidth: fill.style.width,
+              fillBg: fill.style.background,
+              overWidth: document.getElementById('proj-over100').style.width,
+              tickLeft: document.getElementById('proj-tick100').style.left,
+              proj100: document.getElementById('proj-100').textContent,
+              warn: document.getElementById('proj-100').classList.contains('warn'),
+            };
+            """
+        )
+        check(
+            "C3d: projection > 100 % -> zone hachurée, marqueur rouge, tick 100 % avant la fin",
+            over
+            and norm(over["pct"]) == "95%"
+            and over["markOver"] is True
+            and over["markLabel"].startswith("~")
+            and int(over["markLabel"].replace("~", "").replace(" %", "")) > 100
+            and float(over["fillWidth"].rstrip("%")) > 50
+            and float(over["overWidth"].rstrip("%")) > 0
+            and float(over["tickLeft"].rstrip("%")) < 100
+            and "100 %" in over["proj100"],
+            json.dumps(over, ensure_ascii=False)[:220],
         )
         # C3c : #nokey -> plan masqué, bouton « Configurer la clé API » -> options
         client.navigate(f"http://127.0.0.1:{HTTP_PORT}/options/options.html")

@@ -19,8 +19,12 @@ const btnConfigKey = $("btn-config-key");
 const accErrorEl = $("acc-error");
 const localTokensEl = $("local-tokens");
 const projEl = $("projection");
+const projOver100El = $("proj-over100");
+const projFillEl = $("proj-fill");
+const projTick100El = $("proj-tick100");
+const projMarkEl = $("proj-mark");
+const projMarkLabelEl = $("proj-mark-label");
 const projRateEl = $("proj-rate");
-const projEndEl = $("proj-end");
 const proj100El = $("proj-100");
 
 const btnMenu = $("btn-menu");
@@ -94,16 +98,36 @@ function renderProjection(b) {
     return;
   }
   projEl.classList.remove("hidden");
-  projRateEl.textContent = `Rythme actuel : ${p.rate.toFixed(1)} %/jour (${p.periodDays - p.daysLeft} j écoulés sur ${p.periodDays})`;
-  projEndEl.textContent = `Fin de période (dans ${p.daysLeft} j) : ~${Math.round(p.endPct)} % du budget`;
+
+  // Échelle : 100 % minimum, sinon assez pour contenir la projection.
+  const scaleMax = Math.max(100, Math.ceil(p.endPct / 10) * 10);
+  const x = (v) => `${Math.min(100, (v / scaleMax) * 100)}%`;
+
+  // zone hachurée au-delà de 100 %
+  projOver100El.style.left = x(100);
+  projOver100El.style.width = p.endPct > 100 ? x(scaleMax - 100) : "0%";
+  // consommé actuel (couleur du badge)
+  projFillEl.style.width = x(b.pct);
+  projFillEl.style.background = b.color ?? "#1a7f37";
+  // tick 100 %
+  projTick100El.style.left = x(100);
+  // marqueur de fin de période
+  projMarkEl.style.left = x(p.endPct);
+  projMarkLabelEl.style.left = x(p.endPct);
+  projMarkLabelEl.textContent = `~${Math.round(p.endPct)} %`;
+  projMarkLabelEl.classList.toggle("over", p.endPct > 100);
+
+  projRateEl.textContent = `Rythme actuel : ${p.rate.toFixed(1)} %/jour (${p.periodDays - p.daysLeft} j écoulés sur ${p.periodDays}, réinit dans ${p.daysLeft} j)`;
   if (Number.isFinite(p.daysTo100)) {
     const j = Math.round(p.daysTo100);
-    proj100El.textContent =
-      p.daysTo100 <= p.daysLeft
-        ? `À ce rythme, 100 % atteints dans ~${j} j (avant la réinitialisation)`
-        : `À ce rythme, 100 % atteints dans ~${j} j (après la réinitialisation)`;
+    const avant = p.daysTo100 <= p.daysLeft;
+    proj100El.textContent = avant
+      ? `À ce rythme, 100 % atteints dans ~${j} j (avant la réinitialisation)`
+      : `À ce rythme, 100 % atteints dans ~${j} j (après la réinitialisation)`;
+    proj100El.classList.toggle("warn", avant);
   } else {
     proj100El.textContent = "Aucune conso pour l'instant — 100 % hors de portée à ce rythme.";
+    proj100El.classList.remove("warn");
   }
 }
 
