@@ -10,11 +10,12 @@ Phases :
   A. build xpi + install temporaire -> le manifest MV3 (sidebar_action +
      background.scripts) charge, uuid résoluble.
   B. storage.js seedé (settings + usage) -> badge « 15% » (comptage local) ;
-     clic sur l'icône -> ouverture de la sidebar de l'extension
-     (action.onClicked -> sidebarAction.open).
+     clic sur l'icône -> pop-up (default_popup) ; bouton « Ouvrir le chat »
+     de la pop-up -> message openChat -> sidebarAction.open.
   C. copie localhost du sidepanel (chrome mock) : streaming + markdown + meta.
   C2. copie localhost des options : bouton permissions (visible sans grant,
       disparaît après accord).
+  C3. copie localhost de la pop-up (chrome mock) : rendu conso/compte/menu.
 
 Usage : python tests/e2e/webstral_e2e.py
 MISTRAL_API_KEY (optionnel) est juste seedé comme clé de chat (jamais affiché).
@@ -185,10 +186,65 @@ OPTIONS_MOCK = """
 </script>
 """
 
+POPUP_MOCK = """
+<script>
+  // Réponses via le DOM (monde isolé Marionette : window.* invisibles).
+  (function () {
+    const state = {
+      ok: true,
+      version: "0.3.0-test",
+      badge: {
+        mode: "account", source: "admin-budget", label: "plan Vibe",
+        pct: 21, color: "#1a7f37", spent: 53.55, total: 255, currency: "EUR",
+        resetAt: "2026-12-01T00:00:00Z", fetchedAt: Date.now() - 5 * 60000,
+      },
+      settings: { warnPct: 70, dangerPct: 90, monthlyBudgetTokens: null },
+      account: {
+        consoleCredits: { fetchedAt: Date.now(), total: 100, spent: 40, currency: "EUR" },
+        consoleCreditsError: null,
+        accountBudget: { fetchedAt: Date.now(), vibe: { usage_percentage: 21.2, initial_budget: 255, currency: "EUR", reset_at: "2026-12-01T00:00:00Z" } },
+        accountBudgetError: null,
+        subscriptionPlan: { fetchedAt: Date.now(), plan: "pro", planRaw: "Pro", planPath: "subscription.plan.name" },
+        subscriptionPlanError: null,
+      },
+      localUsage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+      hasApiKey: true,
+      modelCount: 3,
+    };
+    window.chrome = {
+      storage: {
+        local: { get: async () => ({}), set: async () => {} },
+        onChanged: { addListener: () => {} },
+      },
+      runtime: {
+        getManifest: () => ({ version: "0.3.0-test" }),
+        getURL: (p) => p,
+        sendMessage: (m) => {
+          if (m.type === "getPopupState") return Promise.resolve(state);
+          if (m.type === "openChat") {
+            document.body.dataset.openChat = "1";
+            return Promise.resolve({ ok: true });
+          }
+          return Promise.resolve({});
+        },
+        openOptionsPage: () => { document.body.dataset.optionsOpened = "1"; },
+      },
+      tabs: {
+        create: (opts) => {
+          document.body.dataset.tabsCreate =
+            (document.body.dataset.tabsCreate || "") + "|" + opts.url;
+        },
+      },
+    };
+  })();
+</script>
+"""
+
 
 def build_srv(srv_dir: Path) -> None:
     shutil.copytree(EXT_DIR / "sidepanel", srv_dir / "sidepanel")
     shutil.copytree(EXT_DIR / "options", srv_dir / "options")
+    shutil.copytree(EXT_DIR / "popup", srv_dir / "popup")
     sp = (srv_dir / "sidepanel" / "sidepanel.html").read_text(encoding="utf-8")
     (srv_dir / "sidepanel" / "sidepanel.html").write_text(
         sp.replace(
@@ -202,6 +258,14 @@ def build_srv(srv_dir: Path) -> None:
         op.replace(
             '<script type="module" src="options.js"></script>',
             OPTIONS_MOCK + '<script type="module" src="options.js"></script>',
+        ),
+        encoding="utf-8",
+    )
+    pp = (srv_dir / "popup" / "popup.html").read_text(encoding="utf-8")
+    (srv_dir / "popup" / "popup.html").write_text(
+        pp.replace(
+            '<script type="module" src="popup.js"></script>',
+            POPUP_MOCK + '<script type="module" src="popup.js"></script>',
         ),
         encoding="utf-8",
     )
@@ -269,28 +333,24 @@ def main() -> int:
         )
         check("B: badge = 15% (comptage local seed)", badge == "15%", repr(badge))
 
-        before = chrome_script(
-            """
-            const box = win.document.getElementById('sidebar-box');
-            if (!box) return null;
-            return {
-              hidden: box.hidden,
-              cmd: box.getAttribute('sidebarcommand'),
-              src: (box.getAttribute('src') || '').slice(0, 45),
-            };
-            """
+        # Le manifest embarqué (xpi buildé depuis extension/) doit déclarer
+        # la pop-up sur l'action.
+        with zipfile.ZipFile(xpi) as z:
+            manifest_popup = json.loads(z.read("manifest.json"))["action"].get("default_popup")
+        check(
+            "B: manifest embarqué déclare action.default_popup",
+            manifest_popup == "popup/popup.html",
+            repr(manifest_popup),
         )
-        print("B: sidebar avant clic:", before)
 
-        click_ok = chrome_script(
-            """
-            const b = win.document.getElementById('webstral_cabon14_com-BAP');
-            if (!b) return false;
-            b.click();
-            return true;
-            """
-        )
-        time.sleep(1.5)
+        # En headless, un clic synthétique sur le bouton n'ouvre pas de
+        # panel pop-up inspectable ; on valide à la place :
+        # - manifest embarqué : action.default_popup (check ci-dessus, Python) ;
+        # - la sidebar de l'extension s'ouvre à l'installation
+        #   (sidebar_action.open_at_install) ;
+        # - le flux « openChat -> sidebarAction.open » du vrai background est
+        #   couvert par tests/ff-sidebar-smoke.mjs, et le rendu/boutons de la
+        #   pop-up par la phase C3 ci-dessous.
         after = chrome_script(
             """
             const box = win.document.getElementById('sidebar-box');
@@ -309,10 +369,10 @@ def main() -> int:
             };
             """
         )
-        print("B: sidebar après clic:", after)
+        print("B: sidebar (open_at_install):", after)
         check(
-            "B: sidebar extension active (install + clic icône)",
-            click_ok and after is not None and not after["hidden"] and after["isExt"],
+            "B: sidebar extension active à l'installation (open_at_install)",
+            after is not None and not after["hidden"] and after["isExt"],
             f"after={after}",
         )
 
@@ -376,6 +436,64 @@ def main() -> int:
             and opt_after.get("buttonHidden")
             and "accordé" in (opt_after.get("view") or ""),
             json.dumps(opt_after, ensure_ascii=False)[:160],
+        )
+
+        # ---- Phase C3 : copie localhost de la pop-up (chrome mock)
+        client.navigate(f"http://127.0.0.1:{HTTP_PORT}/popup/popup.html")
+        time.sleep(0.8)
+        pop = client.execute_script(
+            """
+            const fill = document.getElementById('bar-fill');
+            return {
+              version: document.getElementById('version').textContent,
+              pct: document.getElementById('conso-pct').textContent,
+              width: fill.style.width,
+              bg: fill.style.background,
+              detail: document.getElementById('conso-detail').textContent,
+              plan: document.getElementById('acc-plan').textContent,
+              wallet: document.getElementById('acc-wallet').textContent,
+              key: document.getElementById('acc-key').textContent,
+              tokens: document.getElementById('local-tokens').textContent,
+            };
+            """
+        )
+        check(
+            "C3: pop-up rend conso (21%) + compte (Pro) + local (15 tokens)",
+            pop
+            and pop["version"] == "v0.3.0-test"
+            and pop["pct"].replace(" ", "").replace("\u202f", "").replace("\u00a0", "") == "21%"
+            and pop["width"] == "21%"
+            and "26" in pop["bg"]  # rgb(26, 127, 55) = #1a7f37
+            and "255" in pop["detail"]
+            and pop["plan"] == "Pro"
+            and pop["key"] == "configurée"
+            and pop["tokens"].replace(" ", "").replace("\u202f", "").replace("\u00a0", "") == "15",
+            json.dumps(pop, ensure_ascii=False)[:200],
+        )
+        menu = client.execute_script(
+            """
+            document.getElementById('btn-menu').click();
+            const menu = document.getElementById('menu');
+            const visible = menu && !menu.classList.contains('hidden');
+            document.getElementById('btn-chat').click();
+            document.getElementById('btn-about').click();
+            document.getElementById('btn-options').click();
+            return {
+              visible,
+              openChat: document.body.dataset.openChat || '',
+              tabsCreate: document.body.dataset.tabsCreate || '',
+              optionsOpened: document.body.dataset.optionsOpened || '',
+            };
+            """
+        )
+        check(
+            "C3: menu pop-up (chat -> openChat, about -> onglet, options -> openOptionsPage)",
+            menu
+            and menu["visible"]
+            and menu["openChat"] == "1"
+            and "pages/about.html" in menu["tabsCreate"]
+            and menu["optionsOpened"] == "1",
+            json.dumps(menu, ensure_ascii=False)[:200],
         )
 
         return 0 if all(ok for _, ok in checks) else 1

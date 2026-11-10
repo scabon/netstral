@@ -4,29 +4,22 @@
 
 const API_BASE = "https://api.mistral.ai/v1";
 
-// Cross-browser : Chrome = side panel, Firefox = sidebar.
-// - Chrome : chrome.sidePanel.setPanelBehavior ouvre le side panel au clic
-//   sur l'icône (l'API n'existe pas sur Firefox).
-// - Firefox : chrome.sidebarAction.open() depuis le handler action.onClicked.
-function setOpenPanelOnAction() {
-  if (chrome.sidePanel?.setPanelBehavior) {
-    chrome.sidePanel
-      .setPanelBehavior({ openPanelOnActionClick: true })
-      .catch((err) => console.error("setPanelBehavior failed:", err));
+// Le clic sur l'icône ouvre la pop-up (action.default_popup dans le
+// manifest). La pop-up demande l'ouverture du panneau de chat via le
+// message "openChat" : Chrome -> sidePanel.open, Firefox -> sidebarAction.open.
+async function openChatPanel() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const windowId = tab?.windowId;
+  if (chrome.sidePanel?.open) {
+    await chrome.sidePanel.open({ windowId });
   } else if (chrome.sidebarAction?.open) {
-    chrome.action.onClicked.addListener((tab) => {
-      try {
-        const p = chrome.sidebarAction.open({ windowId: tab.windowId });
-        p?.catch?.((err) => console.error("sidebarAction.open failed:", err));
-      } catch (err) {
-        console.error("sidebarAction.open failed:", err);
-      }
-    });
+    await chrome.sidebarAction.open({ windowId });
+  } else {
+    throw new Error("API sidePanel/sidebarAction indisponible.");
   }
 }
 
 chrome.runtime.onInstalled.addListener(() => {
-  setOpenPanelOnAction();
   ensureBudgetAlarm();
   refreshBudgetAndBadge().catch((err) =>
     console.error("budget refresh failed:", err)
@@ -34,7 +27,6 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 chrome.runtime.onStartup?.addListener(() => {
-  setOpenPanelOnAction();
   ensureBudgetAlarm();
   updateBadge().catch((err) => console.error("updateBadge failed:", err));
 });
@@ -319,10 +311,97 @@ async function fetchAccountBudget() {
   return { ok: true, accountBudget: record };
 }
 
+// ---------- Plan du compte (gratuit / pro / entreprise) ----------
+// Sonde les procédures local-trpc de la famille subscriptions/info avec la
+// session : la réponse (non documentée) porte le palier du compte. Toute
+// chaîne ressemblant à un nom de plan est classifiée ; l'aperçu brut est
+// conservé pour debug (les options l'affichent).
+const SUBSCRIPTION_PROCS = [
+  "billing.subscriptions.current",
+  "billing.subscription",
+  "billing.subscriptions.list",
+  "billing.info",
+];
+
+const NULL_INPUT = encodeURIComponent(
+  '{"json":null,"meta":{"values":["undefined"],"v":1}}'
+);
+const subscriptionUrl = (proc) =>
+  `https://admin.mistral.ai/api/local-trpc/${proc}?input=${NULL_INPUT}`;
+
+// Aplati un objet JSON en "chemin.pointé=valeur" pour les chaînes (profondeur 5).
+function flattenStrings(obj, prefix = "", depth = 0, out = {}) {
+  if (depth > 5 || !obj || typeof obj !== "object") return out;
+  for (const [k, v] of Object.entries(obj)) {
+    const path = prefix ? `${prefix}.${k}` : k;
+    if (typeof v === "string") out[path] = v;
+    else if (v && typeof v === "object")
+      flattenStrings(v, path, depth + 1, out);
+  }
+  return out;
+}
+
+const PLAN_PATTERNS = [
+  [/^(free|gratuit)$/i, "free"],
+  [/^pro$/i, "pro"],
+  [/(enterprise|entreprise)/i, "enterprise"],
+  [/^(team|équipe)$/i, "team"],
+  [/^scale$/i, "scale"],
+  [/(trial|essai)/i, "trial"],
+];
+
+// Cherche un nom de plan dans les chaînes aplaties : d'abord les chemins
+// explicites (plan/tier/subscription/…), puis toutes les autres.
+function classifyPlan(strings) {
+  const entries = Object.entries(strings);
+  const explicit = entries.filter(([p]) =>
+    /(plan|tier|subscription|level|package|name)/i.test(p)
+  );
+  for (const [path, v] of [...explicit, ...entries]) {
+    for (const [re, label] of PLAN_PATTERNS) {
+      if (re.test(v)) return { plan: label, raw: v, path };
+    }
+  }
+  return null;
+}
+
+async function fetchSubscriptionPlan() {
+  let lastError = null;
+  for (const proc of SUBSCRIPTION_PROCS) {
+    const res = await fetchJsonWithSession(subscriptionUrl(proc));
+    if (!res.ok) {
+      lastError = res.error;
+      continue;
+    }
+    const data =
+      res.json?.result?.data?.json ?? res.json?.result?.data ?? res.json ?? null;
+    if (!data || typeof data !== "object") {
+      lastError = "Format de réponse inattendu.";
+      continue;
+    }
+    const strings = flattenStrings(data);
+    const found = classifyPlan(strings);
+    const record = {
+      fetchedAt: Date.now(),
+      source: `admin-trpc:${proc}`,
+      plan: found?.plan ?? null,
+      planRaw: found?.raw ?? null,
+      planPath: found?.path ?? null,
+      rawStrings: strings,
+      rawPreview: safePreview(data),
+    };
+    await chrome.storage.local.set({ subscriptionPlan: record });
+    if (found) return { ok: true, subscriptionPlan: record };
+    lastError = "Réponse reçue mais aucun nom de plan reconnu.";
+  }
+  return { ok: false, error: lastError ?? "Aucune réponse exploitable." };
+}
+
 async function refreshBudgetAndBadge() {
-  const [creditsRes, adminRes] = await Promise.allSettled([
+  const [creditsRes, adminRes, planRes] = await Promise.allSettled([
     fetchConsoleCredits(),
     fetchAccountBudget(),
+    fetchSubscriptionPlan(),
   ]);
   if (creditsRes.status === "fulfilled") {
     const r = creditsRes.value;
@@ -336,6 +415,12 @@ async function refreshBudgetAndBadge() {
     const r = adminRes.value;
     await chrome.storage.local.set(
       r.ok ? { accountBudgetError: null } : { accountBudgetError: r.error }
+    );
+  }
+  if (planRes.status === "fulfilled") {
+    const r = planRes.value;
+    await chrome.storage.local.set(
+      r.ok ? { subscriptionPlanError: null } : { subscriptionPlanError: r.error }
     );
   }
   await updateBadge();
@@ -375,60 +460,94 @@ async function recordUsage(usage) {
   await chrome.storage.local.set({ usage: all });
 }
 
-// Met à jour le badge de l'icône. Priorité :
+function badgeColor(pct, settings) {
+  return pct >= settings.dangerPct
+    ? "#b3261e" // rouge
+    : pct >= settings.warnPct
+      ? "#f9a825" // orange
+      : "#1a7f37"; // vert
+}
+
+// État du badge, partagé entre l'icône (updateBadge) et la pop-up
+// (getPopupState) : même source prioritaire, même % et même couleur.
+// Priorité des sources :
 // 1. plan Vibe (admin billing.budget.vibe_budget — la page /subscription) ;
 // 2. allocation API incluse dans l'abonnement (api_budget) ;
 // 3. crédits PAYG de la console (wallet non nul) ;
-// 4. comptage local « tokens passés par Webstral » vs budget de tokens ;
-// 5. rien.
-async function updateBadge() {
+// 4. comptage local « tokens passés par Webstral » vs budget de tokens.
+// mode "account" = source 1-3, mode "local" = source 4, mode "none" = rien.
+async function computeBadgeState() {
   const settings = await getSettings();
-  const { consoleCredits, accountBudget } = await chrome.storage.local.get([
-    "consoleCredits",
-    "accountBudget",
-  ]);
+  const { consoleCredits, accountBudget, usage: all = {} } =
+    await chrome.storage.local.get([
+      "consoleCredits",
+      "accountBudget",
+      "usage",
+    ]);
 
   const record = pickBudgetRecord(consoleCredits, accountBudget);
   if (record) {
     const pct = Math.min(100, Math.round(record.usage_percentage));
-    const color =
-      pct >= settings.dangerPct
-        ? "#b3261e"
-        : pct >= settings.warnPct
-          ? "#f9a825"
-          : "#1a7f37";
-    const cur = record.currency ?? "EUR";
-    const amount =
+    const spent =
       record.total != null
-        ? `${round2((record.usage_percentage / 100) * record.total)} ${cur} sur ${round2(record.total)} ${cur}`
+        ? round2((record.usage_percentage / 100) * record.total)
+        : null;
+    return {
+      mode: "account",
+      source: record.source ?? null,
+      label: record.label,
+      pct,
+      color: badgeColor(pct, settings),
+      spent,
+      total: record.total != null ? round2(record.total) : null,
+      currency: record.currency ?? "EUR",
+      resetAt: record.reset_at ?? null,
+      fetchedAt: record.fetchedAt ?? null,
+    };
+  }
+
+  const spentTokens = all?.[monthKey()]?.total_tokens ?? 0;
+  if (!settings.monthlyBudgetTokens) {
+    return {
+      mode: "none",
+      label: "comptage local",
+      pct: null,
+      color: null,
+      spentTokens,
+      budgetTokens: null,
+    };
+  }
+  const pct = Math.min(
+    100,
+    Math.floor((spentTokens / settings.monthlyBudgetTokens) * 100)
+  );
+  return {
+    mode: "local",
+    label: "comptage local",
+    pct,
+    color: badgeColor(pct, settings),
+    spentTokens,
+    budgetTokens: settings.monthlyBudgetTokens,
+  };
+}
+
+// Met à jour le badge de l'icône à partir de computeBadgeState().
+async function updateBadge() {
+  const state = await computeBadgeState();
+  if (state.pct != null) {
+    const amount =
+      state.mode === "account" && state.total != null
+        ? ` (${state.spent} ${state.currency} sur ${state.total} ${state.currency})`
         : "";
-    const title =
-      `Webstral — ${record.label} : ${pct}%` + (amount ? ` (${amount})` : "");
-    await chrome.action.setTitle({ title });
-    await chrome.action.setBadgeBackgroundColor({ color });
-    await chrome.action.setBadgeText({ text: `${pct}%` });
+    await chrome.action.setTitle({
+      title: `Webstral — ${state.label} : ${state.pct}%${amount}`,
+    });
+    await chrome.action.setBadgeBackgroundColor({ color: state.color });
+    await chrome.action.setBadgeText({ text: `${state.pct}%` });
     return;
   }
   await chrome.action.setTitle({ title: "Webstral" });
-
-  if (!settings.monthlyBudgetTokens) {
-    await chrome.action.setBadgeText({ text: "" });
-    return;
-  }
-  const { usage: all = {} } = await chrome.storage.local.get("usage");
-  const spent = all[monthKey()]?.total_tokens ?? 0;
-  const pct = Math.min(
-    100,
-    Math.floor((spent / settings.monthlyBudgetTokens) * 100)
-  );
-  const color =
-    pct >= settings.dangerPct
-      ? "#b3261e" // rouge
-      : pct >= settings.warnPct
-        ? "#f9a825" // orange
-        : "#1a7f37"; // vert
-  await chrome.action.setBadgeBackgroundColor({ color });
-  await chrome.action.setBadgeText({ text: `${pct}%` });
+  await chrome.action.setBadgeText({ text: "" });
 }
 
 function round2(n) {
@@ -440,10 +559,22 @@ function pickBudgetRecord(consoleCredits, accountBudget) {
   const fresh = (rec) => rec && Date.now() - rec.fetchedAt < BUDGET_TTL_MS;
   if (fresh(accountBudget)) {
     if (accountBudget.vibe) {
-      return { ...accountBudget.vibe, total: accountBudget.vibe.initial_budget, label: "plan Vibe" };
+      return {
+        ...accountBudget.vibe,
+        total: accountBudget.vibe.initial_budget,
+        label: "plan Vibe",
+        fetchedAt: accountBudget.fetchedAt,
+        source: accountBudget.source,
+      };
     }
     if (accountBudget.api) {
-      return { ...accountBudget.api, total: accountBudget.api.initial_budget, label: "allocation API" };
+      return {
+        ...accountBudget.api,
+        total: accountBudget.api.initial_budget,
+        label: "allocation API",
+        fetchedAt: accountBudget.fetchedAt,
+        source: accountBudget.source,
+      };
     }
   }
   if (
@@ -454,6 +585,52 @@ function pickBudgetRecord(consoleCredits, accountBudget) {
     return { ...consoleCredits, label: "crédits PAYG" };
   }
   return null;
+}
+
+// ---------- Pop-up ----------
+
+// Snapshot complet pour la pop-up : état du badge (même calcul que
+// l'icône), infos compte, plan, erreurs de session, usage local du mois.
+async function getPopupState() {
+  const settings = await getSettings();
+  const st = await chrome.storage.local.get([
+    "consoleCredits",
+    "consoleCreditsError",
+    "accountBudget",
+    "accountBudgetError",
+    "subscriptionPlan",
+    "subscriptionPlanError",
+    "usage",
+    "apiKey",
+    "models",
+  ]);
+  const badge = await computeBadgeState();
+  const localUsage = st.usage?.[monthKey()] ?? {
+    prompt_tokens: 0,
+    completion_tokens: 0,
+    total_tokens: 0,
+  };
+  return {
+    ok: true,
+    version: chrome.runtime.getManifest().version,
+    badge,
+    settings: {
+      warnPct: settings.warnPct,
+      dangerPct: settings.dangerPct,
+      monthlyBudgetTokens: settings.monthlyBudgetTokens,
+    },
+    account: {
+      consoleCredits: st.consoleCredits ?? null,
+      consoleCreditsError: st.consoleCreditsError ?? null,
+      accountBudget: st.accountBudget ?? null,
+      accountBudgetError: st.accountBudgetError ?? null,
+      subscriptionPlan: st.subscriptionPlan ?? null,
+      subscriptionPlanError: st.subscriptionPlanError ?? null,
+    },
+    localUsage,
+    hasApiKey: Boolean(st.apiKey),
+    modelCount: Array.isArray(st.models) ? st.models.length : 0,
+  };
 }
 
 // ---------- Chat en streaming ----------
@@ -634,6 +811,20 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
       sendResponse({ probes: results, adminScan, adminProbes, consoleScan });
     })();
+    return true; // réponse asynchrone
+  }
+
+  if (msg.type === "openChat") {
+    openChatPanel()
+      .then(() => sendResponse({ ok: true }))
+      .catch((err) => sendResponse({ ok: false, error: String(err) }));
+    return true; // réponse asynchrone
+  }
+
+  if (msg.type === "getPopupState") {
+    getPopupState()
+      .then(sendResponse)
+      .catch((err) => sendResponse({ ok: false, error: String(err) }));
     return true; // réponse asynchrone
   }
 

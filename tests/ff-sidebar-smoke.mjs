@@ -1,5 +1,6 @@
-// Smoke test du mode Firefox : pas de chrome.sidePanel — l'icône doit ouvrir
-// la sidebar via chrome.sidebarAction.open (enregistré sur action.onClicked).
+// Smoke test de l'ouverture du panneau de chat depuis la pop-up :
+// le message "openChat" doit ouvrir le side panel (Chrome : sidePanel.open)
+// ou la sidebar (Firefox : sidebarAction.open, pas de chrome.sidePanel).
 // Usage : node tests/ff-sidebar-smoke.mjs
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
@@ -9,71 +10,77 @@ const code = readFileSync(
   "utf8"
 );
 
-const installedListeners = [];
-const clickListeners = [];
-const sidebarOpens = [];
-const badgeCalls = [];
-
-const chromeMock = {
-  storage: {
-    local: {
-      get: async () => ({}),
-      set: async () => {},
-      remove: async () => {},
+function makeContext({ withSidePanel }) {
+  const messageListeners = [];
+  const opens = [];
+  const chromeMock = {
+    storage: {
+      local: { get: async () => ({}), set: async () => {} },
+      onChanged: { addListener: () => {} },
     },
-    onChanged: { addListener: () => {} },
-  },
-  runtime: {
-    onInstalled: { addListener: (fn) => installedListeners.push(fn) },
-    onStartup: { addListener: (fn) => installedListeners.push(fn) },
-    onConnect: { addListener: () => {} },
-    onMessage: { addListener: () => {} },
-  },
-  // mode Firefox : pas de sidePanel
-  sidePanel: undefined,
-  sidebarAction: {
-    open: (opts) => {
-      sidebarOpens.push(opts);
-      return Promise.resolve();
+    runtime: {
+      onInstalled: { addListener: () => {} },
+      onStartup: { addListener: () => {} },
+      onConnect: { addListener: () => {} },
+      onMessage: { addListener: (fn) => messageListeners.push(fn) },
+      getManifest: () => ({ version: "0.3.0" }),
     },
-  },
-  action: {
-    onClicked: { addListener: (fn) => clickListeners.push(fn) },
-    setBadgeText: async ({ text }) => badgeCalls.push(["text", text]),
-    setBadgeBackgroundColor: async () => {},
-    setTitle: async () => {},
-  },
-  alarms: {
-    onAlarm: { addListener: () => {} },
-    create: () => {},
-  },
-};
+    tabs: { query: async () => [{ windowId: 42 }] },
+    sidePanel: withSidePanel
+      ? { open: async (opts) => opens.push(["sidePanel", opts]) }
+      : undefined,
+    sidebarAction: !withSidePanel
+      ? {
+          open: (opts) => {
+            opens.push(["sidebar", opts]);
+            return Promise.resolve();
+          },
+        }
+      : undefined,
+    action: {
+      setBadgeText: async () => {},
+      setBadgeBackgroundColor: async () => {},
+      setTitle: async () => {},
+    },
+    alarms: { onAlarm: { addListener: () => {} }, create: () => {} },
+  };
+  const context = vm.createContext({
+    chrome: chromeMock,
+    console,
+    fetch: async () => ({ ok: false, status: 401 }),
+    TextDecoder,
+    TextEncoder,
+    AbortController,
+    setTimeout,
+    clearTimeout,
+    Date,
+  });
+  vm.runInContext(code, context);
+  const send = (msg) =>
+    new Promise((resolve) => {
+      for (const l of messageListeners) l(msg, {}, resolve);
+    });
+  return { send, opens };
+}
 
-const context = vm.createContext({
-  chrome: chromeMock,
-  console,
-  fetch: async () => ({ ok: false, status: 401 }),
-  TextDecoder,
-  TextEncoder,
-  AbortController,
-  setTimeout,
-  clearTimeout,
-  Date,
-});
-vm.runInContext(code, context);
+async function scenario(name, withSidePanel, expectedApi) {
+  const { send, opens } = makeContext({ withSidePanel });
+  const res = await send({ type: "openChat" });
+  const ok =
+    res?.ok === true &&
+    opens.length === 1 &&
+    opens[0][0] === expectedApi &&
+    opens[0][1].windowId === 42;
+  console.log(
+    `${ok ? "PASS" : "FAIL"} ${name}: res=${JSON.stringify(res)} opens=${JSON.stringify(opens)}`
+  );
+  return ok;
+}
 
-// onInstalled doit brancher la sidebar sans jamais toucher sidePanel
-await installedListeners[0]();
-console.log("sidebar branchée:", clickListeners.length === 1);
+const results = [];
+results.push(await scenario("Chrome -> sidePanel.open", true, "sidePanel"));
+results.push(await scenario("Firefox -> sidebarAction.open", false, "sidebar"));
 
-// clic simulé → sidebarAction.open
-await clickListeners[0]({ windowId: 42 });
-console.log("opens:", JSON.stringify(sidebarOpens));
-await new Promise((r) => setTimeout(r, 100));
-
-const pass =
-  clickListeners.length === 1 &&
-  sidebarOpens.length === 1 &&
-  sidebarOpens[0].windowId === 42;
+const pass = results.every(Boolean);
 console.log(pass ? "PASS" : "FAIL");
 process.exit(pass ? 0 : 1);

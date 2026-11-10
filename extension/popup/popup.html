@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Webstral</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <div class="brand">Webstral <span id="version" class="version"></span></div>
+    <div class="spacer"></div>
+    <button id="btn-menu" title="Menu">&#8942;</button>
+    <nav id="menu" class="menu hidden">
+      <button id="btn-chat">Ouvrir le chat</button>
+      <button id="btn-refresh">Actualiser la conso</button>
+      <hr>
+      <button id="btn-options">Paramètres</button>
+      <button id="btn-changelog">Changelog</button>
+      <button id="btn-about">À propos</button>
+    </nav>
+  </header>
+
+  <main>
+    <section class="conso">
+      <div class="conso-head">
+        <span id="conso-label">Consommation</span>
+        <span id="conso-pct" class="pct"></span>
+      </div>
+      <div class="bar"><div id="bar-fill" class="fill"></div></div>
+      <div id="conso-detail" class="detail"></div>
+      <div id="conso-source" class="note"></div>
+    </section>
+
+    <section class="account">
+      <h2>Compte Mistral</h2>
+      <div class="kv"><span>Type de plan</span><strong id="acc-plan">—</strong></div>
+      <div class="kv"><span>Crédits PAYG</span><strong id="acc-wallet">—</strong></div>
+      <div class="kv"><span>Réinitialisation</span><strong id="acc-reset">—</strong></div>
+      <div class="kv"><span>Clé API (BYOK)</span><strong id="acc-key">—</strong></div>
+      <div id="acc-error" class="error hidden"></div>
+      <div id="acc-updated" class="note"></div>
+    </section>
+
+    <section class="local">
+      <h2>Webstral ce mois-ci</h2>
+      <div class="kv"><span>Tokens (comptage local)</span><strong id="local-tokens">—</strong></div>
+    </section>
+  </main>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
