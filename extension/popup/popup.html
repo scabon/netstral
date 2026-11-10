@@ -72,7 +72,7 @@
 
     <div id="view-settings" class="hidden">
       <div class="back-row">
-        <button id="btn-back" class="icon-btn" data-i18n-title="back" title="Retour">&#8592;</button>
+        <button id="btn-back" class="icon-btn btn-back" data-i18n-title="back" title="Retour">&#8592;</button>
         <h2 data-i18n="set_title">Réglages</h2>
       </div>
       <section class="settings">
@@ -115,9 +115,18 @@
         </div>
       </section>
     </div>
+
+    <div id="view-changelog" class="hidden">
+      <div class="back-row">
+        <button id="btn-back-changelog" class="icon-btn btn-back" data-i18n-title="back" title="Retour">&#8592;</button>
+        <h2 data-i18n="menu_changelog">Changelog</h2>
+      </div>
+      <section class="changelog" id="changelogContent"></section>
+    </div>
   </main>
 
   <script src="../i18n.js"></script>
+  <script src="../changelog.js"></script>
   <script type="module" src="popup.js"></script>
 </body>
 </html>

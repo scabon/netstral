@@ -380,7 +380,8 @@ button.mini:hover {
 /* ---- vues (main / réglages) ---- */
 
 #view-main,
-#view-settings {
+#view-settings,
+#view-changelog {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -388,7 +389,8 @@ button.mini:hover {
 
 /* .hidden doit gagner sur le display:flex des vues (spécificité ID) */
 #view-main.hidden,
-#view-settings.hidden {
+#view-settings.hidden,
+#view-changelog.hidden {
   display: none;
 }
 
@@ -480,4 +482,36 @@ button.mini:hover {
   accent-color: var(--accent);
   width: 15px;
   height: 15px;
+}
+
+/* ---- vue changelog ---- */
+
+.changelog {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.changelog h3 {
+  font-size: 12px;
+  font-weight: 700;
+  margin: 12px 0 3px;
+  color: var(--text);
+}
+
+.changelog h3:first-child {
+  margin-top: 0;
+}
+
+.changelog p {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted2);
+}
+
+.changelog code {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  background: var(--bar-bg);
+  border-radius: 4px;
+  padding: 1px 4px;
 }

@@ -261,6 +261,7 @@ POPUP_MOCK = """
 def build_srv(srv_dir: Path) -> None:
     srv_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy(EXT_DIR / "i18n.js", srv_dir / "i18n.js")
+    shutil.copy(EXT_DIR / "changelog.js", srv_dir / "changelog.js")
     shutil.copy(EXT_DIR / "shared.css", srv_dir / "shared.css")
     shutil.copytree(EXT_DIR / "sidepanel", srv_dir / "sidepanel")
     shutil.copytree(EXT_DIR / "popup", srv_dir / "popup")
@@ -452,6 +453,18 @@ def main() -> int:
               r.backToMain = !document.getElementById('view-main').classList.contains('hidden');
               r.mainDisplayBack = getComputedStyle(document.getElementById('view-main')).display;
               r.settingsDisplayBack = getComputedStyle(document.getElementById('view-settings')).display;
+              // changelog : menu ⋮ -> Changelog -> vue changelog, retour <- vue main
+              document.getElementById('btn-menu').click();
+              document.getElementById('btn-changelog').click();
+              r.changelogShown = !document.getElementById('view-changelog').classList.contains('hidden');
+              r.changelogDisplay = getComputedStyle(document.getElementById('view-changelog')).display;
+              r.mainDisplayChangelog = getComputedStyle(document.getElementById('view-main')).display;
+              r.settingsDisplayChangelog = getComputedStyle(document.getElementById('view-settings')).display;
+              r.changelogEntries = document.querySelectorAll('#changelogContent h3').length;
+              r.changelogTop = (document.querySelector('#changelogContent h3') || {}).textContent || '';
+              document.getElementById('btn-back-changelog').click();
+              r.backFromChangelog = !document.getElementById('view-main').classList.contains('hidden');
+              r.changelogDisplayBack = getComputedStyle(document.getElementById('view-changelog')).display;
               const th = document.getElementById('themeSelect');
               th.value = 'dark'; th.dispatchEvent(new Event('change'));
               const lg = document.getElementById('langSelect');
@@ -467,7 +480,7 @@ def main() -> int:
             """
         )
         check(
-            "C2: réglages en vue dédiée (menu ⋮ -> Réglages -> retour), dark + EN, drapeaux, alertes, clé",
+            "C2: vues dédiées (⋮ -> Réglages/Changelog -> retour), dark + EN, drapeaux, alertes, clé",
             disp is not None
             and disp.get("mainVisible") is True
             and disp.get("settingsHidden") is True
@@ -480,6 +493,14 @@ def main() -> int:
             and disp.get("mainDisplaySettings") == "none"
             and disp.get("mainDisplayBack") == "flex"
             and disp.get("settingsDisplayBack") == "none"
+            and disp.get("changelogShown") is True
+            and disp.get("changelogDisplay") == "flex"
+            and disp.get("mainDisplayChangelog") == "none"
+            and disp.get("settingsDisplayChangelog") == "none"
+            and disp.get("changelogEntries", 0) >= 19
+            and disp.get("changelogTop", "").startswith("v0.5.2")
+            and disp.get("backFromChangelog") is True
+            and disp.get("changelogDisplayBack") == "none"
             and disp.get("setTitleFr") == "Réglages"
             and disp.get("theme") == "dark"
             and disp.get("setTitleEn") == "Settings"
@@ -490,7 +511,7 @@ def main() -> int:
             and disp.get("alertPct") == "90"
             and disp.get("notifyReset") is True
             and disp.get("keyFilled") is True,
-            json.dumps(disp, ensure_ascii=False)[:300],
+            json.dumps(disp, ensure_ascii=False)[:1500],
         )
 
         # ---- Phase C3 : copie localhost de la pop-up (chrome mock)

@@ -40,7 +40,6 @@ const menuEl = $("menu");
 const btnChat = $("btn-chat");
 const btnRefresh = $("btn-refresh");
 const btnSettings = $("btn-settings");
-const btnBack = $("btn-back");
 const btnChangelog = $("btn-changelog");
 const btnAbout = $("btn-about");
 
@@ -286,14 +285,33 @@ notifyOnResetEl.addEventListener("change", () =>
   saveSettings({ notifyOnReset: notifyOnResetEl.checked })
 );
 
-// Navigation entre les vues (main / réglages), comme wagonBAR.
+// Navigation entre les vues (main / réglages / changelog), comme wagonBAR.
+const VIEWS = ["main", "settings", "changelog"];
+
 function showView(name) {
-  $("view-main").classList.toggle("hidden", name !== "main");
-  $("view-settings").classList.toggle("hidden", name !== "settings");
+  for (const v of VIEWS) $(`view-${v}`).classList.toggle("hidden", v !== name);
   menuEl.classList.add("hidden");
 }
 btnSettings.addEventListener("click", () => showView("settings"));
-btnBack.addEventListener("click", () => showView("main"));
+document.querySelectorAll(".btn-back").forEach((b) =>
+  b.addEventListener("click", () => showView("main"))
+);
+
+// ---------- Changelog (données embarquées, FR uniquement) ----------
+
+function buildChangelog() {
+  const el = $("changelogContent");
+  const frag = document.createDocumentFragment();
+  for (const entry of window.WebstralChangelog ?? []) {
+    const h = document.createElement("h3");
+    h.textContent = entry.h;
+    const p = document.createElement("p");
+    p.innerHTML = entry.p; // contenu statique embarqué avec l'extension
+    frag.append(h, p);
+  }
+  el.replaceChildren(frag);
+}
+buildChangelog();
 
 let keyTimer = null;
 apiKeyInput.addEventListener("input", () => {
@@ -332,9 +350,7 @@ btnRefresh.addEventListener("click", async () => {
   }
 });
 
-btnChangelog.addEventListener("click", () =>
-  chrome.tabs.create({ url: chrome.runtime.getURL("pages/changelog.html") })
-);
+btnChangelog.addEventListener("click", () => showView("changelog"));
 btnAbout.addEventListener("click", () =>
   chrome.tabs.create({ url: chrome.runtime.getURL("pages/about.html") })
 );
