@@ -679,8 +679,6 @@ def main() -> int:
             const menu = document.getElementById('menu');
             const visible = menu && !menu.classList.contains('hidden');
             document.getElementById('btn-chat').click();
-            document.getElementById('btn-console').click();
-            document.getElementById('btn-subscription').click();
             document.getElementById('btn-about').click();
             document.getElementById('btn-options').click();
             return {
@@ -688,19 +686,21 @@ def main() -> int:
               openChat: document.body.dataset.openChat || '',
               tabsCreate: document.body.dataset.tabsCreate || '',
               optionsOpened: document.body.dataset.optionsOpened || '',
+              linkConsole: (document.getElementById('link-console') || {}).href || '',
+              linkSub: (document.getElementById('link-subscription') || {}).href || '',
             };
             """
         )
         check(
-            "C3: menu pop-up (chat/console/subscription/about/options)",
+            "C3: menu pop-up (chat/about/options) + liens console/admin en bas",
             menu
             and menu["visible"]
             and menu["openChat"] == "1"
-            and "console.mistral.ai" in menu["tabsCreate"]
-            and "admin.mistral.ai/subscription" in menu["tabsCreate"]
             and "pages/about.html" in menu["tabsCreate"]
-            and menu["optionsOpened"] == "1",
-            json.dumps(menu, ensure_ascii=False)[:220],
+            and menu["optionsOpened"] == "1"
+            and "console.mistral.ai" in menu["linkConsole"]
+            and "admin.mistral.ai/subscription" in menu["linkSub"],
+            json.dumps(menu, ensure_ascii=False)[:240],
         )
 
         return 0 if all(ok for _, ok in checks) else 1

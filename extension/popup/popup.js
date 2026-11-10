@@ -33,8 +33,6 @@ const btnMenu = $("btn-menu");
 const menuEl = $("menu");
 const btnChat = $("btn-chat");
 const btnRefresh = $("btn-refresh");
-const btnConsole = $("btn-console");
-const btnSubscription = $("btn-subscription");
 const btnOptions = $("btn-options");
 const btnChangelog = $("btn-changelog");
 const btnAbout = $("btn-about");
@@ -270,13 +268,8 @@ btnRefresh.addEventListener("click", async () => {
   await load();
 });
 
-// Liens rapides vers la console et l'abonnement admin.
-btnConsole.addEventListener("click", () =>
-  chrome.tabs.create({ url: "https://console.mistral.ai/" })
-);
-btnSubscription.addEventListener("click", () =>
-  chrome.tabs.create({ url: "https://admin.mistral.ai/subscription" })
-);
+// Liens rapides console/admin : de simples ancres <a target="_blank"> en bas
+// de la pop-up (footer .links), rien à câbler ici.
 
 btnOptions.addEventListener("click", () => chrome.runtime.openOptionsPage());
 btnConfigKey.addEventListener("click", () => chrome.runtime.openOptionsPage());

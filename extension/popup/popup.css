@@ -319,3 +319,25 @@ button.mini:hover {
   color: #b3261e;
   font-weight: 600;
 }
+
+.links {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 12px 10px;
+  font-size: 11px;
+}
+
+.links a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.links a:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.links .dot {
+  color: var(--muted);
+}
