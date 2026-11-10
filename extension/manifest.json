@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Webstral",
-  "version": "0.3.4",
+  "version": "0.4.0",
   "description": "Discutez avec les modèles Mistral depuis n'importe quel onglet, avec suivi de consommation de tokens.",
   "minimum_chrome_version": "116",
   "browser_specific_settings": {
@@ -37,7 +37,8 @@
   "permissions": [
     "storage",
     "sidePanel",
-    "alarms"
+    "alarms",
+    "notifications"
   ],
   "host_permissions": [
     "https://api.mistral.ai/*",
@@ -46,7 +47,7 @@
   ],
   "background": {
     "service_worker": "background/background.js",
-    "scripts": ["background/background.js"]
+    "scripts": ["i18n.js", "background/background.js"]
   },
   "options_page": "options/options.html"
 }

@@ -17,6 +17,7 @@ const chromeMock = {
     onChanged: { addListener: () => {} },
   },
   runtime: {
+    i18n: { getUILanguage: () => "fr-FR" },
     onInstalled: { addListener: () => {} },
     onStartup: { addListener: () => {} },
     onConnect: { addListener: (fn) => connectListeners.push(fn) },
@@ -48,7 +49,7 @@ const context = vm.createContext({
   TextDecoder,
   TextEncoder,
 });
-vm.runInContext(code, context);
+vm.runInContext(readFileSync(new URL("../extension/i18n.js", import.meta.url), "utf8") + "\n" + code, context);
 
 const port = {
   name: "webstral-chat",

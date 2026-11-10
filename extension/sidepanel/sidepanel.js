@@ -1,5 +1,19 @@
 // Webstral - UI du side panel : chat, streaming, markdown minimal.
 
+let t = (k) => k; // remplacé au boot via settings.lang
+
+async function bootI18n() {
+  const { settings } = await chrome.storage.local.get("settings");
+  const lang = WebstralI18n.resolveLang(
+    settings?.lang,
+    chrome.i18n?.getUILanguage?.() ?? "fr-FR"
+  );
+  t = WebstralI18n.makeT(lang);
+  WebstralI18n.applyI18n(document, t);
+  WebstralI18n.applyTheme(settings?.theme ?? "system");
+  document.documentElement.lang = lang;
+}
+
 const DEFAULT_MODEL = "mistral-small-latest";
 const FALLBACK_MODELS = [
   "mistral-small-latest",
@@ -115,7 +129,7 @@ function renderConversation() {
   if (conversation.length === 0) {
     const hint = document.createElement("div");
     hint.className = "hint";
-    hint.textContent = "Posez une question à Webstral.";
+    hint.textContent = t("sp_hint");
     chatEl.appendChild(hint);
     return;
   }
@@ -126,7 +140,10 @@ function renderConversation() {
     if (m.role === "assistant" && m.usage) {
       const meta = document.createElement("div");
       meta.className = "meta";
-      meta.textContent = `${m.usage.prompt_tokens} tokens in, ${m.usage.completion_tokens} tokens out`;
+      meta.textContent = t("sp_meta", {
+        in: m.usage.prompt_tokens,
+        out: m.usage.completion_tokens,
+      });
       chatEl.appendChild(meta);
     }
   }
@@ -185,14 +202,17 @@ function ensurePort() {
         last.usage = msg.usage;
         const meta = document.createElement("div");
         meta.className = "meta";
-        meta.textContent = `${msg.usage.prompt_tokens} tokens in, ${msg.usage.completion_tokens} tokens out`;
+        meta.textContent = t("sp_meta", {
+          in: msg.usage.prompt_tokens,
+          out: msg.usage.completion_tokens,
+        });
         chatEl.appendChild(meta);
         chatEl.scrollTop = chatEl.scrollHeight;
       }
       saveConversation();
     } else if (msg.type === "error") {
       finishStreaming();
-      showError(msg.message);
+      showError(msg.messageKey ? t(msg.messageKey) : msg.message);
       // retire l'éventuelle bulle assistant vide
       const last = conversation[conversation.length - 1];
       if (last?.role === "assistant" && !last.content) conversation.pop();
@@ -225,7 +245,7 @@ async function send() {
 
   const { apiKey } = await chrome.storage.local.get("apiKey");
   if (!apiKey) {
-    showError("Configurez votre clé API Mistral dans les paramètres (roue dentée).");
+    showError(t("sp_err_no_key_local"));
     return;
   }
 
@@ -275,5 +295,5 @@ modelSelect.addEventListener("change", () => {
 
 // ---------- démarrage ----------
 
-loadState().then(renderConversation);
+bootI18n().then(() => loadState().then(renderConversation));
 promptEl.focus();

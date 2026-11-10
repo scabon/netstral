@@ -7,11 +7,11 @@
 </head>
 <body>
   <header>
-    <div class="brand">Webstral</div>
+    <div class="brand" data-i18n="appName">Webstral</div>
     <select id="model-select" title="Modèle Mistral"></select>
     <div class="spacer"></div>
-    <button id="btn-new" title="Nouvelle conversation">+</button>
-    <button id="btn-options" title="Paramètres">&#9881;</button>
+    <button id="btn-new" data-i18n-title="sp_new_chat" title="Nouvelle conversation">+</button>
+    <button id="btn-options" data-i18n-title="sp_options" title="Paramètres">&#9881;</button>
   </header>
 
   <main id="chat"></main>
@@ -19,11 +19,12 @@
   <footer>
     <div id="error-banner" class="error hidden"></div>
     <div class="input-row">
-      <textarea id="prompt" rows="2" placeholder="Message à Webstral… (Entrée pour envoyer, Maj+Entrée pour un saut de ligne)"></textarea>
-      <button id="btn-send" title="Envoyer">&#10148;</button>
+      <textarea id="prompt" rows="2" data-i18n-ph="sp_placeholder" placeholder="Message à Webstral… (Entrée pour envoyer, Maj+Entrée pour un saut de ligne)"></textarea>
+      <button id="btn-send" data-i18n-title="sp_send" title="Envoyer">&#10148;</button>
     </div>
   </footer>
 
+  <script src="../i18n.js"></script>
   <script type="module" src="sidepanel.js"></script>
 </body>
 </html>

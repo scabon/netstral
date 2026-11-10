@@ -95,6 +95,7 @@ const chromeMock = {
     onChanged: { addListener: () => {} },
   },
   runtime: {
+    i18n: { getUILanguage: () => "fr-FR" },
     onInstalled: { addListener: () => {} },
     onStartup: { addListener: () => {} },
     onConnect: { addListener: () => {} },
@@ -123,7 +124,7 @@ const context = vm.createContext({
   setTimeout,
   clearTimeout,
 });
-vm.runInContext(code, context);
+vm.runInContext(readFileSync(new URL("../extension/i18n.js", import.meta.url), "utf8") + "\n" + code, context);
 
 function sendRefresh() {
   return new Promise((resolve) => {

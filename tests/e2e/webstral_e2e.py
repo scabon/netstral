@@ -166,9 +166,18 @@ OPTIONS_MOCK = """
   // Compteurs via le DOM ( monde isolé Marionette : window.* invisibles )
   (function () {
     window.__permGranted = { v: false };
+    const store = {}; // persistant : bootI18n relit settings après chaque set
     window.chrome = {
       storage: {
-        local: { get: async () => ({}), set: async () => {} },
+        local: {
+          get: async (k) => {
+            const want = Array.isArray(k) ? k : [k];
+            const out = {};
+            for (const key of want) if (key in store) out[key] = store[key];
+            return typeof k === "string" ? { [k]: store[k] } : out;
+          },
+          set: async (o) => Object.assign(store, o),
+        },
         onChanged: { addListener: () => {} },
       },
       runtime: {
@@ -197,6 +206,7 @@ POPUP_MOCK = """
     const state = {
       ok: true,
       version: "0.3.0-test",
+      lang: "fr",
       badge: {
         mode: "account", source: "admin-budget", label: "plan Vibe",
         pct: 21, color: "#1a7f37", spent: 53.55, total: 255, currency: "EUR",
@@ -270,6 +280,8 @@ POPUP_MOCK = """
 
 
 def build_srv(srv_dir: Path) -> None:
+    srv_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy(EXT_DIR / "i18n.js", srv_dir / "i18n.js")
     shutil.copytree(EXT_DIR / "sidepanel", srv_dir / "sidepanel")
     shutil.copytree(EXT_DIR / "options", srv_dir / "options")
     shutil.copytree(EXT_DIR / "popup", srv_dir / "popup")
@@ -471,6 +483,39 @@ def main() -> int:
             json.dumps(opt_after, ensure_ascii=False)[:160],
         )
 
+        # ---- Phase C2b : langue + thème + alertes dans les options
+        disp = client.execute_script(
+            """
+            const theme = document.getElementById('theme');
+            theme.value = 'dark';
+            theme.dispatchEvent(new Event('change'));
+            const lang = document.getElementById('lang');
+            lang.value = 'en';
+            lang.dispatchEvent(new Event('change'));
+            return { themeAvant: document.documentElement.dataset.theme };
+            """
+        )
+        time.sleep(0.6)
+        disp_after = client.execute_script(
+            """
+            return {
+              theme: document.documentElement.dataset.theme,
+              testBtn: document.getElementById('btn-test').textContent,
+              alerts: document.getElementById('alerts-enabled').checked,
+              alertPct: String(document.getElementById('alert-pct').value),
+            };
+            """
+        )
+        check(
+            "C2b: thème dark + langue EN appliqués, case alertes cochée à 90%",
+            disp is not None
+            and disp_after.get("theme") == "dark"
+            and disp_after.get("testBtn") == "Test connection and load models"
+            and disp_after.get("alerts") is True
+            and disp_after.get("alertPct") == "90",
+            json.dumps(disp_after, ensure_ascii=False)[:200],
+        )
+
         # ---- Phase C3 : copie localhost de la pop-up (chrome mock)
         client.navigate(f"http://127.0.0.1:{HTTP_PORT}/popup/popup.html")
         time.sleep(0.8)
@@ -634,6 +679,8 @@ def main() -> int:
             const menu = document.getElementById('menu');
             const visible = menu && !menu.classList.contains('hidden');
             document.getElementById('btn-chat').click();
+            document.getElementById('btn-console').click();
+            document.getElementById('btn-subscription').click();
             document.getElementById('btn-about').click();
             document.getElementById('btn-options').click();
             return {
@@ -645,13 +692,15 @@ def main() -> int:
             """
         )
         check(
-            "C3: menu pop-up (chat -> openChat, about -> onglet, options -> openOptionsPage)",
+            "C3: menu pop-up (chat/console/subscription/about/options)",
             menu
             and menu["visible"]
             and menu["openChat"] == "1"
+            and "console.mistral.ai" in menu["tabsCreate"]
+            and "admin.mistral.ai/subscription" in menu["tabsCreate"]
             and "pages/about.html" in menu["tabsCreate"]
             and menu["optionsOpened"] == "1",
-            json.dumps(menu, ensure_ascii=False)[:200],
+            json.dumps(menu, ensure_ascii=False)[:220],
         )
 
         return 0 if all(ok for _, ok in checks) else 1

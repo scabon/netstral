@@ -19,6 +19,7 @@ function makeContext({ withSidePanel }) {
       onChanged: { addListener: () => {} },
     },
     runtime: {
+      i18n: { getUILanguage: () => "fr-FR" },
       onInstalled: { addListener: () => {} },
       onStartup: { addListener: () => {} },
       onConnect: { addListener: () => {} },
@@ -55,7 +56,7 @@ function makeContext({ withSidePanel }) {
     clearTimeout,
     Date,
   });
-  vm.runInContext(code, context);
+  vm.runInContext(readFileSync(new URL("../extension/i18n.js", import.meta.url), "utf8") + "\n" + code, context);
   const send = (msg) =>
     new Promise((resolve) => {
       for (const l of messageListeners) l(msg, {}, resolve);

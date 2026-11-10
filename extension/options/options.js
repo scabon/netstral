@@ -14,6 +14,26 @@ const budgetStatusEl = document.getElementById("budget-status");
 const budgetViewEl = document.getElementById("budget-view");
 const budgetDebugEl = document.getElementById("budget-debug");
 
+let t = (k) => k; // remplacé au boot via settings.lang
+
+const langSel = document.getElementById("lang");
+const themeSel = document.getElementById("theme");
+const alertsEnabledEl = document.getElementById("alerts-enabled");
+const alertPctInput = document.getElementById("alert-pct");
+
+async function bootI18n() {
+  const { settings } = await chrome.storage.local.get("settings");
+  const lang = WebstralI18n.resolveLang(
+    settings?.lang,
+    chrome.i18n?.getUILanguage?.() ?? "fr-FR"
+  );
+  t = WebstralI18n.makeT(lang);
+  WebstralI18n.applyI18n(document, t);
+  WebstralI18n.applyTheme(settings?.theme ?? "system");
+  document.documentElement.lang = lang;
+  document.title = t("opt_title");
+}
+
 const fmtEUR = (n, cur = "EUR") =>
   `${n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${cur}`;
 
@@ -25,10 +45,10 @@ const fmtDateUTC = (iso) => {
   return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}`;
 };
 
-const BUDGET_LABELS = {
-  "console-credits": "Crédits console (wallet PAYG)",
-  "admin-budget": "Abonnement Mistral",
-};
+const BUDGET_LABELS = () => ({
+  "console-credits": t("badge_payg"),
+  "admin-budget": t("opt_sub_account"),
+});
 
 function renderBudgetView() {
   chrome.storage.local
@@ -54,10 +74,10 @@ function renderBudgetView() {
             : "";
         const age = Math.round((Date.now() - c.fetchedAt) / 60000);
         lines.push(
-          `<strong>${BUDGET_LABELS["console-credits"]} :</strong> ${pct}%${part} (lu il y a ${age} min)`
+          `<strong>${BUDGET_LABELS()["console-credits"]} :</strong> ${pct}%${part} (${t("ago_min", { n: age })})`
         );
         debug.push(
-          "champs console : " +
+          t("opt_dbg_fields") + " " +
             Object.entries(c.rawNumeric)
               .map(([k, v]) => `${k}=${v}`)
               .join(", ")
@@ -68,28 +88,28 @@ function renderBudgetView() {
         const age = Math.round((Date.now() - c.fetchedAt) / 60000);
         if (c.total === 0) {
           lines.push(
-            `<strong>${BUDGET_LABELS["console-credits"]} :</strong> vide — aucun crédit prépayé (lu il y a ${age} min)`
+            `<strong>${BUDGET_LABELS()["console-credits"]} :</strong> ${t("opt_wallet_empty")} (${t("ago_min", { n: age })})`
           );
         } else {
           lines.push(
-            `<strong>${BUDGET_LABELS["console-credits"]} :</strong> ${fmtEUR(c.spent ?? 0, c.currency)} consommés sur ${fmtEUR(c.total, c.currency)} (lu il y a ${age} min)`
+            `<strong>${BUDGET_LABELS()["console-credits"]} :</strong> ${t("amount_of", { a: fmtEUR(c.spent ?? 0, c.currency), b: fmtEUR(c.total, c.currency) })} (${t("ago_min", { n: age })})`
           );
         }
       } else if (st.consoleCredits) {
         // réponse reçue mais structure inconnue
         lines.push(
-          `<strong>${BUDGET_LABELS["console-credits"]} :</strong> lu, mais champs non reconnus — voir diagnostic`
+          `<strong>${BUDGET_LABELS()["console-credits"]} :</strong> ${t("opt_unrecognized")}`
         );
         debug.push(
-          "aperçu credits : " + (st.consoleCredits.rawPreview || "(vide)")
+          t("opt_dbg_preview") + " " + (st.consoleCredits.rawPreview || t("opt_dbg_empty"))
         );
       } else if (st.consoleCreditsError) {
         lines.push(
-          `<strong>${BUDGET_LABELS["console-credits"]} :</strong> ${st.consoleCreditsError}`
+          `<strong>${BUDGET_LABELS()["console-credits"]} :</strong> ${st.consoleCreditsError}`
         );
       } else {
         lines.push(
-          `<strong>${BUDGET_LABELS["console-credits"]} :</strong> pas encore lu`
+          `<strong>${BUDGET_LABELS()["console-credits"]} :</strong> ${t("opt_not_read")}`
         );
       }
 
@@ -105,17 +125,17 @@ function renderBudgetView() {
               : "";
           let extra = "";
           if (sub.reset_at) {
-            extra = ` (réinitialisé le ${fmtDateUTC(sub.reset_at)})`;
+            extra = ` (${t("opt_reset_on", { d: fmtDateUTC(sub.reset_at) })})`;
           }
           return `<strong>${label} :</strong> ${pct}%${part}${extra}`;
         };
         lines.push(
-          subLine(a.vibe, "Plan Vibe (page abonnement)") ??
-            "<strong>Plan Vibe</strong> : absent de la réponse"
+          subLine(a.vibe, t("opt_plan_vibe_page")) ??
+            `<strong>${t("opt_plan_vibe_page")}</strong> : ${t("opt_absent")}`
         );
-        const apiLine = subLine(a.api, "Allocation API incluse");
+        const apiLine = subLine(a.api, t("opt_api_allowance"));
         if (apiLine) lines.push(apiLine);
-        debug.push("champs admin : " + (a.rawPreview || "(vide)"));
+        debug.push(t("opt_dbg_admin") + " " + (a.rawPreview || t("opt_dbg_empty")));
       } else if (st.accountBudgetError) {
         lines.push(`<strong>Abonnement :</strong> ${st.accountBudgetError}`);
       }
@@ -126,15 +146,15 @@ function renderBudgetView() {
         const age = Math.round((Date.now() - sp.fetchedAt) / 60000);
         lines.push(
           sp.plan
-            ? `<strong>Type de plan :</strong> ${sp.plan} (${sp.planRaw}, ${sp.planPath}, lu il y a ${age} min)`
-            : `<strong>Type de plan :</strong> non reconnu — brut ci-dessous (lu il y a ${age} min)`
+            ? `<strong>${t("plan_label")} :</strong> ${sp.plan} (${sp.planRaw}, ${sp.planPath}, ${t("ago_min", { n: age })})`
+            : `<strong>${t("plan_label")} :</strong> ${t("opt_plan_unrecognized")} (${t("ago_min", { n: age })})`
         );
-        debug.push("plan source : " + sp.source);
-        debug.push("plan brut : " + (sp.rawPreview || "(vide)"));
+        debug.push(t("opt_plan_source") + " " + sp.source);
+        debug.push(t("opt_plan_raw") + " " + (sp.rawPreview || t("opt_dbg_empty")));
         const rs = Object.entries(sp.rawStrings ?? {})
           .map(([k, v]) => `${k}=${v}`)
           .join(", ");
-        if (rs) debug.push("chaînes : " + rs.slice(0, 600));
+        if (rs) debug.push(t("opt_strings") + " " + rs.slice(0, 600));
       } else if (st.subscriptionPlanError) {
         lines.push(`<strong>Type de plan :</strong> ${st.subscriptionPlanError}`);
       }
@@ -145,15 +165,15 @@ function renderBudgetView() {
         budgetDebugEl.classList.remove("hidden");
       }
       const badgeSource = st.accountBudget?.vibe
-        ? "plan Vibe"
+        ? t("badge_plan_vibe")
         : st.accountBudget?.api
-          ? "allocation API"
+          ? t("badge_allocation")
           : st.consoleCredits && st.consoleCredits.usage_percentage != null
-            ? "crédits PAYG"
+            ? t("badge_payg")
             : null;
       budgetStatusEl.textContent = badgeSource
-        ? `Badge : ${badgeSource}`
-        : "Badge : comptage local";
+        ? `${t("opt_badge_source")} ${badgeSource}`
+        : `${t("opt_badge_source")} ${t("badge_local")}`;
       budgetStatusEl.className = badgeSource ? "ok" : "";
     });
 }
@@ -206,7 +226,7 @@ btnProbe.addEventListener("click", () => {
 });
 
 btnBudget.addEventListener("click", () => {
-  budgetStatusEl.textContent = "Lecture en cours…";
+  budgetStatusEl.textContent = t("opt_budget_reading");
   chrome.runtime.sendMessage({ type: "refreshBudget" }, (res) => {
     if (chrome.runtime.lastError) {
       budgetStatusEl.textContent = chrome.runtime.lastError.message;
@@ -216,7 +236,7 @@ btnBudget.addEventListener("click", () => {
     const creditsErr = res?.consoleCreditsError;
     const adminErr = res?.accountBudgetError;
     if (!res) {
-      budgetStatusEl.textContent = "Pas de réponse du fond.";
+      budgetStatusEl.textContent = t("opt_budget_none");
       budgetStatusEl.className = "err";
     } else if (creditsErr && adminErr) {
       budgetStatusEl.textContent = creditsErr;
@@ -228,12 +248,16 @@ btnBudget.addEventListener("click", () => {
     renderBudgetView();
   });
 });
-renderBudgetView();
+bootI18n().then(renderBudgetView);
 
 const DEFAULT_SETTINGS = {
   monthlyBudgetTokens: null,
   warnPct: 70,
   dangerPct: 90,
+  lang: "system",
+  theme: "system",
+  alertsEnabled: true,
+  alertPct: 90,
 };
 
 function monthKey(date = new Date()) {
@@ -254,20 +278,26 @@ async function loadBadgeSettings() {
   budgetInput.value = s.monthlyBudgetTokens ?? "";
   warnPctInput.value = s.warnPct;
   dangerPctInput.value = s.dangerPct;
+  langSel.value = s.lang ?? "system";
+  themeSel.value = s.theme ?? "system";
+  alertsEnabledEl.checked = s.alertsEnabled !== false;
+  alertPctInput.value = s.alertPct ?? 90;
 
   const cur = all[monthKey()] ?? {
     prompt_tokens: 0,
     completion_tokens: 0,
     total_tokens: 0,
   };
-  let text =
-    `Ce mois-ci : ${formatTokens(cur.total_tokens)} tokens ` +
-    `(${formatTokens(cur.prompt_tokens)} in, ${formatTokens(cur.completion_tokens)} out).`;
+  let text = t("opt_usage_now", {
+    tokens: formatTokens(cur.total_tokens),
+    in: formatTokens(cur.prompt_tokens),
+    out: formatTokens(cur.completion_tokens),
+  });
   if (s.monthlyBudgetTokens) {
     const pct = Math.min(100, Math.floor((cur.total_tokens / s.monthlyBudgetTokens) * 100));
-    text += ` Budget : ${pct}% consommé.`;
+    text += t("opt_usage_now_pct", { pct });
   } else {
-    text += ` Définissez un budget pour activer le badge.`;
+    text += t("opt_usage_now_nobudget");
   }
   usageNowEl.textContent = text;
 }
@@ -278,19 +308,35 @@ async function saveBadgeSettings() {
     budgetInput.value === "" ? null : Math.max(0, Number(budgetInput.value) || 0);
   const warn = Math.min(99, Math.max(1, Number(warnPctInput.value) || 70));
   const danger = Math.min(100, Math.max(2, Number(dangerPctInput.value) || 90));
+  const alertPct = Math.min(100, Math.max(1, Number(alertPctInput.value) || 90));
   await chrome.storage.local.set({
     settings: {
       ...prev,
       monthlyBudgetTokens: budget,
       warnPct: warn,
       dangerPct: danger,
+      alertsEnabled: alertsEnabledEl.checked,
+      alertPct,
     },
   });
+}
+
+// Langue + thème : appliqués immédiatement (textes + data-theme).
+async function saveDisplaySettings() {
+  const { settings: prev = {} } = await chrome.storage.local.get("settings");
+  await chrome.storage.local.set({
+    settings: { ...prev, lang: langSel.value, theme: themeSel.value },
+  });
+  await bootI18n();
 }
 
 budgetInput.addEventListener("input", saveBadgeSettings);
 warnPctInput.addEventListener("input", saveBadgeSettings);
 dangerPctInput.addEventListener("input", saveBadgeSettings);
+alertsEnabledEl.addEventListener("change", saveBadgeSettings);
+alertPctInput.addEventListener("input", saveBadgeSettings);
+langSel.addEventListener("change", saveDisplaySettings);
+themeSel.addEventListener("change", saveDisplaySettings);
 
 function setStatus(text, kind) {
   statusEl.textContent = text;
@@ -312,12 +358,10 @@ const btnPerms = document.getElementById("btn-perms");
 async function refreshPermsView() {
   const has = await chrome.permissions.contains({ origins: ORIGINS });
   if (has) {
-    permViewEl.textContent =
-      "Accès réseau accordé (api.mistral.ai, admin.mistral.ai, console.mistral.ai).";
+    permViewEl.textContent = t("opt_perm_ok");
     btnPerms.classList.add("hidden");
   } else {
-    permViewEl.textContent =
-      "Accès réseau non accordé : activez-le pour que le chat et le badge fonctionnent.";
+    permViewEl.textContent = t("opt_perm_ko");
     btnPerms.classList.remove("hidden");
   }
 }
@@ -325,8 +369,7 @@ async function refreshPermsView() {
 btnPerms.addEventListener("click", async () => {
   const granted = await chrome.permissions.request({ origins: ORIGINS });
   if (!granted) {
-    permViewEl.textContent =
-      "Accès refusé. Il peut aussi être accordé depuis about:addons → Webstral → Permissions.";
+    permViewEl.textContent = t("opt_perm_denied");
     return;
   }
   await refreshPermsView();
@@ -338,9 +381,10 @@ refreshPermsView();
 chrome.storage.local.get("apiKey").then(({ apiKey }) => {
   keyInput.value = apiKey ?? "";
 });
-loadBadgeSettings();
+bootI18n().then(loadBadgeSettings);
 
 // Le compteur d'usage bouge après un tour de chat : on se met à jour.
+// Un changement de settings (langue/thème/seuils) réapplique l'affichage.
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && changes.usage) loadBadgeSettings();
   if (
@@ -350,6 +394,11 @@ chrome.storage.onChanged.addListener((changes, area) => {
       changes.subscriptionPlan)
   )
     renderBudgetView();
+  if (area === "local" && changes.settings)
+    bootI18n().then(() => {
+      loadBadgeSettings();
+      renderBudgetView();
+    });
 });
 
 // Sauvegarde la clé dès qu'elle change (débouncée).
@@ -368,12 +417,12 @@ btnToggle.addEventListener("click", () => {
 btnTest.addEventListener("click", () => {
   const value = keyInput.value.trim();
   if (!value) {
-    setStatus("Collez d'abord une clé API.", "err");
+    setStatus(t("opt_status_no_key"), "err");
     return;
   }
   // s'assure que la clé tapée est déjà persistée avant le test
   chrome.storage.local.set({ apiKey: value }).then(() => {
-    setStatus("Test en cours…");
+    setStatus(t("opt_status_testing"));
     modelList.classList.add("hidden");
     chrome.runtime.sendMessage({ type: "listModels" }, (res) => {
       if (chrome.runtime.lastError) {
@@ -385,7 +434,10 @@ btnTest.addEventListener("click", () => {
         return;
       }
       setStatus(
-        `OK — ${res.models.length} modèle${res.models.length > 1 ? "s" : ""} disponibles.`,
+        t("opt_status_ok_models", {
+          n: res.models.length,
+          plural: res.models.length > 1 ? "s" : "",
+        }),
         "ok"
       );
       modelList.innerHTML = "";

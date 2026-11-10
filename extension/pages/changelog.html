@@ -10,6 +10,19 @@
     <h1>Changelog <span id="version" class="note"></span></h1>
 
     <section>
+      <h2>v0.4.0 — alertes, liens rapides, langue &amp; thème</h2>
+      <p>
+        Notification navigateur quand la consommation franchit un seuil
+        réglable (désactivable) ; liens rapides vers console.mistral.ai et
+        admin.mistral.ai/subscription dans le menu ⋮ de la pop-up et dans
+        les paramètres ; langue (système / FR / EN) et thème (système /
+        clair / sombre) dans les paramètres, appliqués à la pop-up, au side
+        panel, aux options et à la page À propos (i18n embarqué
+        <code>i18n.js</code>, 138 clés fr/en).
+      </p>
+    </section>
+
+    <section>
       <h2>v0.3.4 — projection graphique</h2>
       <p>
         La projection devient une piste graphique : consommé en couleur
@@ -120,9 +133,15 @@
       </p>
     </section>
   </main>
+  <script src="../i18n.js"></script>
   <script>
-    document.getElementById("version").textContent =
-      "v" + chrome.runtime.getManifest().version;
+    (async () => {
+      // le changelog reste en FR (historique) ; on applique seulement le thème
+      const { settings } = await chrome.storage.local.get("settings");
+      WebstralI18n.applyTheme(settings?.theme ?? "system");
+      document.getElementById("version").textContent =
+        "v" + chrome.runtime.getManifest().version;
+    })();
   </script>
 </body>
 </html>

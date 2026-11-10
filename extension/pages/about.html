@@ -2,20 +2,20 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Webstral — À propos</title>
+  <title data-i18n="about_title">Webstral — À propos</title>
   <link rel="stylesheet" href="../options/options.css">
 </head>
 <body>
   <main>
-    <h1>Webstral <span id="version" class="note"></span></h1>
-    <p class="lead">
+    <h1><span data-i18n="appName">Webstral</span> <span id="version" class="note"></span></h1>
+    <p class="lead" data-i18n="about_lead">
       Discutez avec les modèles Mistral depuis n'importe quel onglet,
       avec un badge de consommation de tokens sur l'icône.
     </p>
 
     <section>
-      <h2>BYOK — Bring Your Own Key</h2>
-      <p>
+      <h2 data-i18n="about_byok_h">BYOK — Bring Your Own Key</h2>
+      <p data-i18n="about_byok_p">
         Webstral appelle directement l'API Mistral
         (<code>api.mistral.ai</code>) depuis votre navigateur, avec votre
         propre clé API. Aucune donnée ne transite par un serveur
@@ -24,8 +24,8 @@
     </section>
 
     <section>
-      <h2>Consommation du compte</h2>
-      <p>
+      <h2 data-i18n="about_usage_h">Consommation du compte</h2>
+      <p data-i18n="about_usage_p">
         Connecté sur <a href="https://console.mistral.ai/" target="_blank" rel="noreferrer">console.mistral.ai</a>
         dans ce navigateur, l'extension lit la consommation réelle du compte
         (cookie de session, aucun mot de passe demandé) et l'affiche sur
@@ -35,26 +35,39 @@
     </section>
 
     <section>
-      <h2>Liens</h2>
+      <h2 data-i18n="about_links_h">Liens</h2>
       <p>
-        <a href="https://console.mistral.ai/api-keys" target="_blank" rel="noreferrer">Créer une clé API (La Plateforme)</a><br>
-        <a href="https://admin.mistral.ai/subscription" target="_blank" rel="noreferrer">Abonnement (admin.mistral.ai)</a><br>
-        <a href="https://github.com/scabon/webstral" target="_blank" rel="noreferrer">Code source (GitHub scabon/webstral)</a>
+        <a href="https://console.mistral.ai/api-keys" target="_blank" rel="noreferrer" data-i18n="about_links_keys">Créer une clé API (La Plateforme)</a><br>
+        <a href="https://admin.mistral.ai/subscription" target="_blank" rel="noreferrer" data-i18n="about_links_sub">Abonnement (admin.mistral.ai)</a><br>
+        <a href="https://github.com/scabon/webstral" target="_blank" rel="noreferrer" data-i18n="about_links_src">Code source (GitHub scabon/webstral)</a>
       </p>
     </section>
 
     <section>
-      <h2>Projet</h2>
-      <p class="note">
+      <h2 data-i18n="about_project_h">Projet</h2>
+      <p class="note" data-i18n="about_project_p">
         Projet personnel de la famille Cabon14 — compagnon navigateur de
         Monstral (WearOS). Chrome/Edge (Manifest V3, side panel) et Firefox
         (sidebar). Non publié sur les stores à ce stade.
       </p>
     </section>
   </main>
+  <script src="../i18n.js"></script>
   <script>
-    document.getElementById("version").textContent =
-      "v" + chrome.runtime.getManifest().version;
+    (async () => {
+      const { settings } = await chrome.storage.local.get("settings");
+      const lang = WebstralI18n.resolveLang(
+        settings?.lang,
+        chrome.i18n?.getUILanguage?.() ?? "fr-FR"
+      );
+      const t = WebstralI18n.makeT(lang);
+      WebstralI18n.applyI18n(document, t);
+      WebstralI18n.applyTheme(settings?.theme ?? "system");
+      document.documentElement.lang = lang;
+      document.title = t("about_title");
+      document.getElementById("version").textContent =
+        "v" + chrome.runtime.getManifest().version;
+    })();
   </script>
 </body>
 </html>

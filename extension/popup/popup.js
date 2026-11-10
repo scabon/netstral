@@ -1,7 +1,9 @@
 // Webstral - pop-up de l'icône : conso (même % que le badge), infos compte,
-// menu (chat / actualiser / paramètres / changelog / about).
+// projection, menu (chat / liens / actualiser / paramètres / changelog / about).
 
 const $ = (id) => document.getElementById(id);
+
+let t = (k) => k; // remplacé au chargement via getPopupState.lang
 
 const versionEl = $("version");
 const consoLabelEl = $("conso-label");
@@ -31,18 +33,11 @@ const btnMenu = $("btn-menu");
 const menuEl = $("menu");
 const btnChat = $("btn-chat");
 const btnRefresh = $("btn-refresh");
+const btnConsole = $("btn-console");
+const btnSubscription = $("btn-subscription");
 const btnOptions = $("btn-options");
 const btnChangelog = $("btn-changelog");
 const btnAbout = $("btn-about");
-
-const PLAN_LABELS = {
-  free: "Gratuit",
-  pro: "Pro",
-  enterprise: "Entreprise",
-  team: "Team",
-  scale: "Scale",
-  trial: "Essai",
-};
 
 const fmtEUR = (n, cur = "EUR") =>
   `${n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${cur}`;
@@ -56,10 +51,9 @@ const fmtDate = (iso) => {
 };
 const ilYA = (ts) => {
   const min = Math.max(0, Math.round((Date.now() - ts) / 60000));
-  if (min < 1) return "à l'instant";
-  if (min < 60) return `il y a ${min} min`;
-  const h = Math.round(min / 60);
-  return `il y a ${h} h`;
+  if (min < 1) return t("ago_now");
+  if (min < 60) return t("ago_min", { n: min });
+  return t("ago_hour", { n: Math.round(min / 60) });
 };
 
 const DAY_MS = 86400000;
@@ -117,16 +111,19 @@ function renderProjection(b) {
   projMarkLabelEl.textContent = `~${Math.round(p.endPct)} %`;
   projMarkLabelEl.classList.toggle("over", p.endPct > 100);
 
-  projRateEl.textContent = `Rythme actuel : ${p.rate.toFixed(1)} %/jour (${p.periodDays - p.daysLeft} j écoulés sur ${p.periodDays}, réinit dans ${p.daysLeft} j)`;
+  projRateEl.textContent = t("proj_rate", {
+    r: p.rate.toFixed(1),
+    e: p.periodDays - p.daysLeft,
+    p: p.periodDays,
+    d: p.daysLeft,
+  });
   if (Number.isFinite(p.daysTo100)) {
     const j = Math.round(p.daysTo100);
     const avant = p.daysTo100 <= p.daysLeft;
-    proj100El.textContent = avant
-      ? `À ce rythme, 100 % atteints dans ~${j} j (avant la réinitialisation)`
-      : `À ce rythme, 100 % atteints dans ~${j} j (après la réinitialisation)`;
+    proj100El.textContent = t(avant ? "proj_100_before" : "proj_100_after", { n: j });
     proj100El.classList.toggle("warn", avant);
   } else {
-    proj100El.textContent = "Aucune conso pour l'instant — 100 % hors de portée à ce rythme.";
+    proj100El.textContent = t("proj_100_none");
     proj100El.classList.remove("warn");
   }
 }
@@ -137,7 +134,7 @@ function render(state) {
   // --- Barre de progression (même % et couleur que le badge) ---
   const b = state.badge;
   if (b && b.pct != null) {
-    consoLabelEl.textContent = `Consommation — ${b.label}`;
+    consoLabelEl.textContent = `${t("conso_title")} — ${t(b.labelKey ?? "badge_local")}`;
     consoPctEl.textContent = `${b.pct} %`;
     consoPctEl.style.color = b.color;
     barFillEl.style.width = `${b.pct}%`;
@@ -145,26 +142,28 @@ function render(state) {
     if (b.mode === "account") {
       consoDetailEl.textContent =
         b.total != null
-          ? `${fmtEUR(b.spent, b.currency)} sur ${fmtEUR(b.total, b.currency)}`
-          : `${b.pct} % consommés`;
+          ? t("amount_of", { a: fmtEUR(b.spent, b.currency), b: fmtEUR(b.total, b.currency) })
+          : `${b.pct} %`;
     } else {
-      consoDetailEl.textContent = `${fmtTokens(b.spentTokens)} tokens sur ${fmtTokens(b.budgetTokens)}`;
+      consoDetailEl.textContent = t("tokens_of", {
+        a: fmtTokens(b.spentTokens),
+        b: fmtTokens(b.budgetTokens),
+      });
     }
     consoSourceEl.textContent =
       b.mode === "account" && b.fetchedAt
-        ? `Source : ${b.source ?? b.label} — lu ${ilYA(b.fetchedAt)}`
+        ? t("source_lu", { source: b.source ?? t(b.labelKey ?? "badge_local"), ago: ilYA(b.fetchedAt) })
         : b.mode === "local"
-          ? "Comptage local (pas de session Mistral)"
+          ? t("conso_local_fallback")
           : "";
   } else {
-    consoLabelEl.textContent = "Consommation";
+    consoLabelEl.textContent = t("conso_title");
     consoPctEl.textContent = "—";
     consoPctEl.style.color = "";
     barFillEl.style.width = "0%";
-    barFillEl.style.background = "#ddd";
-    consoDetailEl.textContent = "Aucun budget suivi pour l'instant.";
-    consoSourceEl.textContent =
-      "Connectez-vous sur console.mistral.ai ou définissez un budget de tokens dans les paramètres.";
+    barFillEl.style.background = "var(--bar-bg)";
+    consoDetailEl.textContent = t("conso_no_budget");
+    consoSourceEl.textContent = t("conso_no_budget_hint");
   }
   renderProjection(b);
 
@@ -178,7 +177,8 @@ function render(state) {
   // le mapping de billing.subscriptions.* n'est pas confirmé, on masque.
   const plan = acc.subscriptionPlan;
   if (plan?.plan) {
-    accPlanEl.textContent = PLAN_LABELS[plan.plan] ?? plan.planRaw ?? plan.plan;
+    const label = t(`plan_${plan.plan}`);
+    accPlanEl.textContent = label.startsWith("plan_") ? plan.planRaw ?? plan.plan : label;
     planRowEl.classList.remove("hidden");
   } else {
     planRowEl.classList.add("hidden");
@@ -188,17 +188,17 @@ function render(state) {
   if (credits && credits.total != null) {
     accWalletEl.textContent =
       credits.total > 0
-        ? `${fmtEUR(credits.total - (credits.spent ?? 0), credits.currency)} restants`
-        : "aucun crédit";
+        ? t("wallet_restants", { n: fmtEUR(credits.total - (credits.spent ?? 0), credits.currency) })
+        : t("wallet_none");
   } else {
     accWalletEl.textContent = "—";
   }
 
   if (b?.resetAt) {
     accResetEl.textContent = fmtDate(b.resetAt);
-    const days = Math.ceil((Date.parse(b.resetAt) - Date.now()) / 86400000);
+    const days = Math.ceil((Date.parse(b.resetAt) - Date.now()) / DAY_MS);
     accResetInEl.textContent =
-      days > 1 ? `dans ${days} jours` : days === 1 ? "demain" : "aujourd'hui";
+      days > 1 ? t("reset_in_days", { n: days }) : days === 1 ? t("reset_tomorrow") : t("reset_today");
     accResetInEl.classList.remove("hidden");
   } else {
     accResetEl.textContent = "—";
@@ -218,15 +218,14 @@ function render(state) {
     : acc.consoleCreditsError ?? acc.accountBudgetError ?? acc.subscriptionPlanError ?? null;
   if (err) {
     accErrorEl.innerHTML = "";
-    accErrorEl.append(
-      `${err} Connectez-vous sur `,
-      Object.assign(document.createElement("a"), {
-        href: "https://console.mistral.ai/",
-        target: "_blank",
-        rel: "noreferrer",
-        textContent: "console.mistral.ai",
-      })
-    );
+    const link = Object.assign(document.createElement("a"), {
+      href: "https://console.mistral.ai/",
+      target: "_blank",
+      rel: "noreferrer",
+      textContent: "console.mistral.ai",
+    });
+    const parts = t("session_error_connect", { err, link: "" }).split("{link}");
+    accErrorEl.append(parts[0], link, parts[1] ?? "");
     accErrorEl.classList.remove("hidden");
   } else {
     accErrorEl.classList.add("hidden");
@@ -241,9 +240,12 @@ async function load() {
   try {
     const state = await chrome.runtime.sendMessage({ type: "getPopupState" });
     if (chrome.runtime.lastError) throw new Error(chrome.runtime.lastError.message);
+    t = WebstralI18n.makeT(state.lang ?? "fr");
+    WebstralI18n.applyI18n(document, t);
+    WebstralI18n.applyTheme(state.settings?.theme ?? "system");
     render(state);
   } catch (err) {
-    consoDetailEl.textContent = `Erreur : ${err.message}`;
+    consoDetailEl.textContent = `${t("err_prefix")} ${err.message}`;
   }
 }
 
@@ -263,10 +265,18 @@ btnChat.addEventListener("click", async () => {
 
 btnRefresh.addEventListener("click", async () => {
   menuEl.classList.add("hidden");
-  consoSourceEl.textContent = "Actualisation…";
+  consoSourceEl.textContent = t("refresh_in_progress");
   await chrome.runtime.sendMessage({ type: "refreshBudget" });
   await load();
 });
+
+// Liens rapides vers la console et l'abonnement admin.
+btnConsole.addEventListener("click", () =>
+  chrome.tabs.create({ url: "https://console.mistral.ai/" })
+);
+btnSubscription.addEventListener("click", () =>
+  chrome.tabs.create({ url: "https://admin.mistral.ai/subscription" })
+);
 
 btnOptions.addEventListener("click", () => chrome.runtime.openOptionsPage());
 btnConfigKey.addEventListener("click", () => chrome.runtime.openOptionsPage());
@@ -277,8 +287,7 @@ btnAbout.addEventListener("click", () =>
   chrome.tabs.create({ url: chrome.runtime.getURL("pages/about.html") })
 );
 
-// Rafraîchit en direct quand le badge/les données bougent (fin de tour de
-// chat, alarme 30 min, écriture depuis les options).
+// Rafraîchit en direct quand le badge/les données/langue/thème bougent.
 chrome.storage.onChanged.addListener((changes, area) => {
   if (
     area === "local" &&

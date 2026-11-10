@@ -7,23 +7,27 @@
 </head>
 <body>
   <header>
-    <div class="brand">Webstral <span id="version" class="version"></span></div>
+    <div class="brand" data-i18n="appName">Webstral</div>
+    <span id="version" class="version"></span>
     <div class="spacer"></div>
     <button id="btn-menu" title="Menu">&#8942;</button>
     <nav id="menu" class="menu hidden">
-      <button id="btn-chat">Ouvrir le chat</button>
-      <button id="btn-refresh">Actualiser la conso</button>
+      <button id="btn-chat" data-i18n="menu_openChat">Ouvrir le chat</button>
+      <button id="btn-refresh" data-i18n="menu_refresh">Actualiser la conso</button>
       <hr>
-      <button id="btn-options">Paramètres</button>
-      <button id="btn-changelog">Changelog</button>
-      <button id="btn-about">À propos</button>
+      <button id="btn-console" data-i18n="menu_console">Console Mistral</button>
+      <button id="btn-subscription" data-i18n="menu_subscription">Abonnement (admin)</button>
+      <hr>
+      <button id="btn-options" data-i18n="menu_options">Paramètres</button>
+      <button id="btn-changelog" data-i18n="menu_changelog">Changelog</button>
+      <button id="btn-about" data-i18n="menu_about">À propos</button>
     </nav>
   </header>
 
   <main>
     <section class="card">
       <div class="conso-head">
-        <span id="conso-label">Consommation</span>
+        <span id="conso-label" data-i18n="conso_title">Consommation</span>
         <span id="conso-pct" class="pct"></span>
       </div>
       <div class="bar"><div id="bar-fill" class="fill"></div></div>
@@ -32,16 +36,16 @@
 
       <div class="sep"></div>
 
-      <div class="kv hidden" id="plan-row"><span>Type de plan</span><strong id="acc-plan">—</strong></div>
-      <div class="kv"><span>Crédits PAYG</span><strong id="acc-wallet">—</strong></div>
-      <div class="kv"><span>Réinitialisation</span><strong id="acc-reset">—</strong></div>
+      <div class="kv hidden" id="plan-row"><span data-i18n="plan_label">Type de plan</span><strong id="acc-plan">—</strong></div>
+      <div class="kv"><span data-i18n="wallet_label">Crédits PAYG</span><strong id="acc-wallet">—</strong></div>
+      <div class="kv"><span data-i18n="reset_label">Réinitialisation</span><strong id="acc-reset">—</strong></div>
       <div id="acc-reset-in" class="note right hidden"></div>
-      <div class="kv hidden" id="key-row"><span>Clé API (BYOK)</span><button id="btn-config-key" class="mini">Configurer la clé API</button></div>
+      <div class="kv hidden" id="key-row"><span data-i18n="key_label">Clé API (BYOK)</span><button id="btn-config-key" class="mini" data-i18n="key_config_btn">Configurer la clé API</button></div>
       <div id="acc-error" class="error hidden"></div>
 
       <div id="projection" class="hidden">
         <div class="sep"></div>
-        <div class="note proj-title">Projection fin de période</div>
+        <div class="note proj-title" data-i18n="proj_title">Projection fin de période</div>
         <div class="proj-bar">
           <div id="proj-over100" class="proj-over100"></div>
           <div id="proj-fill" class="proj-fill"></div>
@@ -56,11 +60,12 @@
     </section>
 
     <section class="local">
-      <h2>Webstral ce mois-ci</h2>
-      <div class="kv"><span>Tokens (comptage local)</span><strong id="local-tokens">—</strong></div>
+      <h2 data-i18n="local_title">Webstral ce mois-ci</h2>
+      <div class="kv"><span data-i18n="local_tokens">Tokens (comptage local)</span><strong id="local-tokens">—</strong></div>
     </section>
   </main>
 
+  <script src="../i18n.js"></script>
   <script type="module" src="popup.js"></script>
 </body>
 </html>

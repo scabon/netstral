@@ -4,6 +4,33 @@
 
 const API_BASE = "https://api.mistral.ai/v1";
 
+// i18n embarqué : via background.scripts (Firefox) ou importScripts (Chrome MV3)
+if (typeof WebstralI18n === "undefined" && typeof importScripts === "function") {
+  try {
+    importScripts("i18n.js");
+  } catch (err) {
+    console.error("i18n load failed:", err);
+  }
+}
+
+// Traducteur pour la langue demandée (settings.lang: system|fr|en).
+function tFor(settings) {
+  if (typeof WebstralI18n === "undefined") return (k) => k;
+  const lang = WebstralI18n.resolveLang(
+    settings?.lang,
+    chrome.i18n?.getUILanguage?.() ?? "fr-FR"
+  );
+  return WebstralI18n.makeT(lang);
+}
+
+function resolveLangFor(settings) {
+  if (typeof WebstralI18n === "undefined") return "fr";
+  return WebstralI18n.resolveLang(
+    settings?.lang,
+    chrome.i18n?.getUILanguage?.() ?? "fr-FR"
+  );
+}
+
 // Le clic sur l'icône ouvre la pop-up (action.default_popup dans le
 // manifest). La pop-up demande l'ouverture du panneau de chat via le
 // message "openChat" : Chrome -> sidePanel.open, Firefox -> sidebarAction.open.
@@ -441,6 +468,10 @@ const DEFAULT_SETTINGS = {
   monthlyBudgetTokens: null, // null = pas de badge
   warnPct: 70,
   dangerPct: 90,
+  lang: "system", // system | fr | en
+  theme: "system", // system | light | dark
+  alertsEnabled: true,
+  alertPct: 90,
 };
 
 function monthKey(date = new Date()) {
@@ -501,6 +532,7 @@ async function computeBadgeState() {
       mode: "account",
       source: record.source ?? null,
       label: record.label,
+      labelKey: record.labelKey ?? "badge_local",
       pct,
       color: badgeColor(pct, settings),
       spent,
@@ -516,6 +548,7 @@ async function computeBadgeState() {
     return {
       mode: "none",
       label: "comptage local",
+      labelKey: "badge_local",
       pct: null,
       color: null,
       spentTokens,
@@ -529,6 +562,7 @@ async function computeBadgeState() {
   return {
     mode: "local",
     label: "comptage local",
+    labelKey: "badge_local",
     pct,
     color: badgeColor(pct, settings),
     spentTokens,
@@ -538,21 +572,54 @@ async function computeBadgeState() {
 
 // Met à jour le badge de l'icône à partir de computeBadgeState().
 async function updateBadge() {
+  const settings = await getSettings();
   const state = await computeBadgeState();
   if (state.pct != null) {
+    const t = tFor(settings);
     const amount =
       state.mode === "account" && state.total != null
-        ? ` (${state.spent} ${state.currency} sur ${state.total} ${state.currency})`
+        ? ` (${state.spent} ${state.currency} / ${state.total} ${state.currency})`
         : "";
     await chrome.action.setTitle({
-      title: `Webstral — ${state.label} : ${state.pct}%${amount}`,
+      title: `Webstral — ${t(state.labelKey)} : ${state.pct}%${amount}`,
     });
     await chrome.action.setBadgeBackgroundColor({ color: state.color });
     await chrome.action.setBadgeText({ text: `${state.pct}%` });
+    await maybeNotify(state, settings);
     return;
   }
   await chrome.action.setTitle({ title: "Webstral" });
   await chrome.action.setBadgeText({ text: "" });
+}
+
+// Notification navigateur quand la conso franchit settings.alertPct
+// (une seule fois par passage au-dessus du seuil ; reset quand on redescend).
+async function maybeNotify(state, settings) {
+  if (settings.alertsEnabled === false || state.pct == null) return;
+  const { alertState } = await chrome.storage.local.get("alertState");
+  const alerted = alertState?.alertedPct ?? null;
+  if (state.pct >= settings.alertPct && alerted == null) {
+    if (chrome.notifications?.create) {
+      const t = tFor(settings);
+      const amount =
+        state.mode === "account" && state.total != null
+          ? `${state.spent} ${state.currency} / ${state.total} ${state.currency}`
+          : "";
+      await chrome.notifications.create({
+        type: "basic",
+        iconUrl: "icons/icon-128.png",
+        title: t("notif_title", { pct: state.pct }),
+        message: t("notif_body", {
+          label: t(state.labelKey),
+          pct: state.pct,
+          amount,
+        }),
+      });
+    }
+    await chrome.storage.local.set({ alertState: { alertedPct: state.pct } });
+  } else if (state.pct < settings.alertPct && alerted != null) {
+    await chrome.storage.local.set({ alertState: { alertedPct: null } });
+  }
 }
 
 function round2(n) {
@@ -568,6 +635,7 @@ function pickBudgetRecord(consoleCredits, accountBudget) {
         ...accountBudget.vibe,
         total: accountBudget.vibe.initial_budget,
         label: "plan Vibe",
+        labelKey: "badge_plan_vibe",
         fetchedAt: accountBudget.fetchedAt,
         source: accountBudget.source,
       };
@@ -577,6 +645,7 @@ function pickBudgetRecord(consoleCredits, accountBudget) {
         ...accountBudget.api,
         total: accountBudget.api.initial_budget,
         label: "allocation API",
+        labelKey: "badge_allocation",
         fetchedAt: accountBudget.fetchedAt,
         source: accountBudget.source,
       };
@@ -587,7 +656,7 @@ function pickBudgetRecord(consoleCredits, accountBudget) {
     consoleCredits.usage_percentage != null &&
     (consoleCredits.total ?? 0) > 0
   ) {
-    return { ...consoleCredits, label: "crédits PAYG" };
+    return { ...consoleCredits, label: "crédits PAYG", labelKey: "badge_payg" };
   }
   return null;
 }
@@ -618,11 +687,16 @@ async function getPopupState() {
   return {
     ok: true,
     version: chrome.runtime.getManifest().version,
+    lang: resolveLangFor(settings),
     badge,
     settings: {
       warnPct: settings.warnPct,
       dangerPct: settings.dangerPct,
       monthlyBudgetTokens: settings.monthlyBudgetTokens,
+      lang: settings.lang ?? "system",
+      theme: settings.theme ?? "system",
+      alertsEnabled: settings.alertsEnabled !== false,
+      alertPct: settings.alertPct ?? 90,
     },
     account: {
       consoleCredits: st.consoleCredits ?? null,
@@ -735,11 +809,7 @@ chrome.runtime.onConnect.addListener((port) => {
 
     const apiKey = await getApiKey();
     if (!apiKey) {
-      port.postMessage({
-        type: "error",
-        message:
-          "Aucune clé API configurée. Ouvrez les options de Webstral pour la coller.",
-      });
+      port.postMessage({ type: "error", messageKey: "sp_err_no_key" });
       return;
     }
     await streamChat(port, apiKey, msg.payload);

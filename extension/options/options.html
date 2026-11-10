@@ -2,31 +2,66 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Webstral — Paramètres</title>
+  <title data-i18n="opt_title">Webstral — Paramètres</title>
   <link rel="stylesheet" href="options.css">
 </head>
 <body>
   <main>
-    <h1>Webstral</h1>
-    <p class="lead">
+    <h1 data-i18n="appName">Webstral</h1>
+    <p class="lead" data-i18n="opt_lead">
       Webstral appelle directement l'API Mistral depuis votre navigateur
       (BYOK — Bring Your Own Key). Aucune donnée ne transite ailleurs.
     </p>
 
     <section>
-      <h2>Accès réseau de l'extension</h2>
-      <p id="perm-view" class="note"></p>
+      <h2 data-i18n="opt_section_display">Affichage</h2>
       <div class="row">
-        <button id="btn-perms" class="hidden">Activer l'accès réseau</button>
+        <label for="lang" data-i18n="opt_lang_label">Langue</label>
+        <select id="lang">
+          <option value="system" data-i18n="opt_lang_system">Système</option>
+          <option value="fr" data-i18n="opt_lang_fr">Français</option>
+          <option value="en" data-i18n="opt_lang_en">English</option>
+        </select>
+      </div>
+      <div class="row">
+        <label for="theme" data-i18n="opt_theme_label">Thème</label>
+        <select id="theme">
+          <option value="system" data-i18n="opt_theme_system">Système</option>
+          <option value="light" data-i18n="opt_theme_light">Clair</option>
+          <option value="dark" data-i18n="opt_theme_dark">Sombre</option>
+        </select>
       </div>
     </section>
 
     <section>
-      <h2>Clé API Mistral</h2>
-      <p>
-        Créez une clé sur
+      <h2 data-i18n="opt_section_alerts">Alertes de consommation</h2>
+      <p data-i18n="opt_alerts_help">
+        Une notification navigateur est envoyée quand la consommation franchit le seuil.
+      </p>
+      <div class="row">
+        <input type="checkbox" id="alerts-enabled">
+        <label for="alerts-enabled" data-i18n="opt_alerts_enabled">Activer les notifications</label>
+      </div>
+      <div class="row">
+        <label for="alert-pct" data-i18n="opt_alert_pct_label">Me notifier à (%)</label>
+        <input type="number" id="alert-pct" min="1" max="100" style="width: 70px">
+      </div>
+    </section>
+
+    <section>
+      <h2 data-i18n="opt_section_network">Accès réseau de l'extension</h2>
+      <p id="perm-view" class="note"></p>
+      <div class="row">
+        <button id="btn-perms" class="hidden" data-i18n="opt_perm_btn">Activer l'accès réseau</button>
+      </div>
+    </section>
+
+    <section>
+      <h2 data-i18n="opt_section_key">Clé API Mistral</h2>
+      <p id="key-help">
+        <span data-i18n="opt_key_help_prefix">Créez une clé sur</span>
         <a href="https://console.mistral.ai/api-keys" target="_blank" rel="noreferrer">console.mistral.ai</a>
-        (La Plateforme). Elle reste stockée localement dans l'extension.
+        <span data-i18n="opt_key_help_suffix">(La Plateforme). Elle reste stockée localement dans l'extension.</span>
       </p>
       <div class="row">
         <input type="password" id="api-key" placeholder="Ex. …" autocomplete="off" spellcheck="false">
@@ -35,69 +70,72 @@
     </section>
 
     <section>
-      <h2>Connexion &amp; modèles</h2>
+      <h2 data-i18n="opt_section_conn">Connexion &amp; modèles</h2>
       <div class="row">
-        <button id="btn-test">Tester la connexion et charger les modèles</button>
+        <button id="btn-test" data-i18n="opt_test_btn">Tester la connexion et charger les modèles</button>
         <span id="status"></span>
       </div>
       <ul id="model-list" class="model-list hidden"></ul>
-      <p class="note">
+      <p class="note" data-i18n="opt_model_note">
         Le modèle par défaut se choisit dans le bandeau du side panel.
       </p>
     </section>
 
     <section>
-      <h2>Usage réel du compte (badge)</h2>
+      <h2 data-i18n="opt_section_usage">Usage réel du compte (badge)</h2>
       <p>
-        Affiché en priorité sur le badge : la consommation réelle du compte
-        Mistral (tous canaux — API, Studio, Webstral…), lue depuis votre
-        session Mistral dans ce navigateur (connectez-vous sur
+        <span data-i18n="opt_usage_help_prefix">Affiché en priorité sur le badge : la consommation réelle du compte Mistral (tous canaux — API, Studio, Webstral…), lue depuis votre session Mistral dans ce navigateur (connectez-vous sur</span>
         <a href="https://console.mistral.ai/" target="_blank" rel="noreferrer">console.mistral.ai</a>).
-        Aucun mot de passe n'est demandé : l'extension lit le cookie de
-        session existant.
+        <span data-i18n="opt_usage_help_suffix">Aucun mot de passe n'est demandé : l'extension lit le cookie de session existant.</span>
       </p>
       <div class="row">
-        <button id="btn-budget">Actualiser depuis la session Mistral</button>
+        <button id="btn-budget" data-i18n="opt_refresh_btn">Actualiser depuis la session Mistral</button>
         <span id="budget-status"></span>
       </div>
       <p id="budget-view" class="budget-view"></p>
       <p id="budget-debug" class="note hidden"></p>
       <div class="row">
-        <button id="btn-probe">Diagnostic console (cartographie brute)</button>
+        <button id="btn-probe" data-i18n="opt_probe_btn">Diagnostic console (cartographie brute)</button>
       </div>
       <pre id="probe-view" class="probe-view hidden"></pre>
     </section>
 
     <section>
-      <h2>Comptage local (repli sans session)</h2>
-      <p>
+      <h2 data-i18n="opt_section_local">Comptage local (repli sans session)</h2>
+      <p data-i18n="opt_local_help">
         Sans session Mistral valide, le badge utilise ce comptage : uniquement
         les tokens passés par Webstral, par mois calendaire.
       </p>
-      <p>
-        Budget mensuel de tokens utilisé pour ce repli :
-      </p>
+      <p data-i18n="opt_budget_label">Budget mensuel de tokens utilisé pour ce repli :</p>
       <div class="row">
-        <label for="budget">Budget mensuel (tokens)</label>
+        <label for="budget" data-i18n="opt_budget_label">Budget mensuel (tokens)</label>
         <input type="number" id="budget" min="0" placeholder="ex. 2000000" style="width: 160px">
       </div>
       <div class="row">
-        <label for="warn-pct">Badge orange à (%)</label>
+        <label for="warn-pct" data-i18n="opt_warn_label">Badge orange à (%)</label>
         <input type="number" id="warn-pct" min="1" max="99" style="width: 70px">
-        <label for="danger-pct">rouge à (%)</label>
+        <label for="danger-pct" data-i18n="opt_danger_label">rouge à (%)</label>
         <input type="number" id="danger-pct" min="2" max="100" style="width: 70px">
       </div>
       <p id="usage-now" class="note"></p>
     </section>
 
     <section>
-      <h2>À venir</h2>
-      <p class="note">
-        « Ask Webstral » sur sélection de texte, version Firefox,
-        Admin API (Enterprise) pour un usage facturé hors session.
+      <h2 data-i18n="opt_section_links">Liens rapides</h2>
+      <p>
+        <a href="https://console.mistral.ai/" target="_blank" rel="noreferrer" data-i18n="opt_link_console">Console Mistral (clés API, usage)</a><br>
+        <a href="https://admin.mistral.ai/subscription" target="_blank" rel="noreferrer" data-i18n="opt_link_subscription">Abonnement (admin.mistral.ai)</a>
+      </p>
+    </section>
+
+    <section>
+      <h2 data-i18n="opt_section_todo">À venir</h2>
+      <p class="note" data-i18n="opt_todo_text">
+        « Ask Webstral » sur sélection de texte, Admin API (Enterprise) pour un usage facturé hors session.
       </p>
     </section>
   </main>
+  <script src="../i18n.js"></script>
   <script type="module" src="options.js"></script>
 </body>
 </html>
