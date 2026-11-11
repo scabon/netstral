@@ -165,6 +165,10 @@ POPUP_MOCK = """
       };
       refreshLang();
     }
+    // #refreshko : badge en mode account (cache frais) MAIS dernier refresh en 401
+    if (location.hash === "#refreshko") {
+      state.account.consoleCreditsError = "Session Mistral absente/expirée (HTTP 401).";
+    }
     window.chrome = {
       storage: {
         local: {
@@ -608,6 +612,33 @@ def main() -> int:
             and nokey["planRowHidden"] is True
             and nokey["settingsVisible"] is True,
             json.dumps(nokey, ensure_ascii=False)[:200],
+        )
+
+        # C3e : #refreshko -> source compte (cache frais) affichée MAIS warning refresh échoué
+        client.navigate(f"http://127.0.0.1:{HTTP_PORT}/i18n.js")
+        time.sleep(0.4)
+        client.navigate(f"http://127.0.0.1:{HTTP_PORT}/popup/popup.html#refreshko")
+        time.sleep(0.8)
+        rko = client.execute_script(
+            """
+            return {
+              pct: document.getElementById('conso-pct').textContent,
+              warnVisible: !document.getElementById('acc-error').classList.contains('hidden'),
+              warnClass: document.getElementById('acc-error').className,
+              warnText: document.getElementById('acc-error').textContent,
+              warnLink: (document.querySelector('#acc-error a') || {}).href || '',
+            };
+            """
+        )
+        check(
+            "C3e: refresh échoué avec cache frais -> valeurs affichées + bandeau warn",
+            rko
+            and norm(rko["pct"]) == "21%"
+            and rko["warnVisible"] is True
+            and rko["warnClass"] == "warn"
+            and "401" in rko["warnText"]
+            and "console.mistral.ai" in rko["warnLink"],
+            json.dumps(rko, ensure_ascii=False)[:200],
         )
 
         menu = client.execute_script(

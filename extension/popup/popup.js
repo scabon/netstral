@@ -205,25 +205,31 @@ function render(state) {
     accResetInEl.classList.add("hidden");
   }
 
-  // Bandeau « connectez-vous » dès qu'AUCUNE source compte n'est disponible ;
-  // avec le détail de l'erreur technique quand on en a une (style error),
-  // sinon simple invitation avec lien (style hint).
+  // Bandeau en haut de la pop-up :
+  // - aucune source compte fraîche -> hint « connectez-vous » (ou error + détail) ;
+  // - source compte affichée (cache < 1 h) mais dernier refresh en échec ->
+  //   warning « les valeurs affichées sont les dernières connues » ;
+  // - tout OK -> rien.
   const hasAccountSource = b?.mode === "account";
-  const err = hasAccountSource
-    ? null
-    : acc.consoleCreditsError ?? acc.accountBudgetError ?? acc.subscriptionPlanError ?? null;
+  const err =
+    acc.consoleCreditsError ?? acc.accountBudgetError ?? acc.subscriptionPlanError ?? null;
+  const link = Object.assign(document.createElement("a"), {
+    href: "https://console.mistral.ai/",
+    target: "_blank",
+    rel: "noreferrer",
+    textContent: "console.mistral.ai",
+  });
   if (!hasAccountSource) {
     accErrorEl.innerHTML = "";
-    const link = Object.assign(document.createElement("a"), {
-      href: "https://console.mistral.ai/",
-      target: "_blank",
-      rel: "noreferrer",
-      textContent: "console.mistral.ai",
-    });
     const key = err ? "session_error_connect" : "session_connect_hint";
     const parts = t(key, { err: err ?? "", link: "" }).split("{link}");
     accErrorEl.append(parts[0], link, parts[1] ?? "");
     accErrorEl.className = err ? "error" : "hint";
+  } else if (err) {
+    accErrorEl.innerHTML = "";
+    const parts = t("refresh_failed_cached", { err, link: "" }).split("{link}");
+    accErrorEl.append(parts[0], link, parts[1] ?? "");
+    accErrorEl.className = "warn";
   } else {
     accErrorEl.className = "error hidden";
   }

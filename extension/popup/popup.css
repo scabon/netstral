@@ -14,6 +14,9 @@
   --hint-bg: #e8f0fe;
   --hint-text: #1a56db;
   --hint-border: #c5d8fb;
+  --warn-bg: #fff4e0;
+  --warn-text: #9a6200;
+  --warn-border: #ffd9a0;
   --menu-shadow: rgba(0, 0, 0, 0.12);
   --hover: #f0f0f0;
   --hatch-a: #fdecea;
@@ -34,6 +37,9 @@
   --hint-bg: #1c2b4a;
   --hint-text: #9ec1ff;
   --hint-border: #2c3f66;
+  --warn-bg: #3a2f1a;
+  --warn-text: #ffb74d;
+  --warn-border: #5a4a2a;
   --menu-shadow: rgba(0, 0, 0, 0.5);
   --hover: #2a2a3a;
   --hatch-a: #3a1f1d;
@@ -287,6 +293,20 @@ button.mini:hover {
 
 .hint a {
   color: var(--hint-text);
+}
+
+.warn {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+  border: 1px solid var(--warn-border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.warn a {
+  color: var(--warn-text);
 }
 
 .hidden {
