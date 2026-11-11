@@ -60,8 +60,6 @@ const I18N_MESSAGES = {
     notif_body: "{label} : {pct} % du budget consommé ({amount}).",
     // réglages (dans la pop-up)
     set_title: "Réglages",
-    set_key_label: "Clé API Mistral",
-    set_key_ph: "Ex. …",
     set_theme_label: "Thème",
     set_theme_system: "Système",
     set_theme_light: "Clair",
@@ -75,15 +73,14 @@ const I18N_MESSAGES = {
     notif_reset_body: "Nouveau cycle de facturation : la consommation repart de 0.",
     // aide (contenu de la vue Aide)
     help_lead:
-      "Discutez avec les modèles Mistral depuis n'importe quel onglet, avec un badge de consommation de tokens sur l'icône.",
-    help_byok_h: "BYOK — Bring Your Own Key",
+      "Suivez votre consommation Mistral (badge sur l'icône) et ouvrez chat.mistral.ai en un clic.",
+    help_byok_h: "Aucune clé API requise",
     help_byok_p:
-      "Netstral appelle directement l'API Mistral (api.mistral.ai) depuis votre navigateur, avec votre propre clé API. Aucune donnée ne transite par un serveur intermédiaire ; la clé reste stockée localement dans l'extension.",
+      "Netstral n'appelle jamais l'API Mistral : il suffit d'être connecté à console.mistral.ai dans ce navigateur. L'extension lit la facturation avec le cookie de session ; aucune donnée ne transite par un serveur intermédiaire.",
     help_usage_h: "Consommation du compte",
     help_usage_p:
-      "Connecté sur console.mistral.ai dans ce navigateur, l'extension lit la consommation réelle du compte (cookie de session, aucun mot de passe demandé) et l'affiche sur l'icône et dans la pop-up. Sans session, elle retombe sur un comptage local des tokens passés par Netstral.",
+      "Connecté sur console.mistral.ai dans ce navigateur, l'extension lit la consommation réelle du compte (cookie de session, aucun mot de passe demandé) et l'affiche sur l'icône et dans la pop-up. Sans session, aucune donnée n'est disponible (le chat se fait sur chat.mistral.ai, hors extension).",
     help_links_h: "Liens",
-    help_links_keys: "Créer une clé API (La Plateforme)",
     help_links_sub: "Abonnement (admin.mistral.ai)",
     help_links_src: "Code source (GitHub scabon/netstral)",
     help_project_h: "Projet",
@@ -157,8 +154,6 @@ const I18N_MESSAGES = {
     notif_title: "Netstral — usage at {pct} %",
     notif_body: "{label}: {pct} % of the budget used ({amount}).",
     set_title: "Settings",
-    set_key_label: "Mistral API key",
-    set_key_ph: "Ex. …",
     set_theme_label: "Theme",
     set_theme_system: "System",
     set_theme_light: "Light",
@@ -171,15 +166,14 @@ const I18N_MESSAGES = {
     notif_reset_title: "Netstral — quota reset",
     notif_reset_body: "New billing cycle: usage is back to 0.",
     help_lead:
-      "Chat with Mistral models from any tab, with a token-usage badge on the toolbar icon.",
-    help_byok_h: "BYOK — Bring Your Own Key",
+      "Track your Mistral usage (badge on the toolbar icon) and open chat.mistral.ai in one click.",
+    help_byok_h: "No API key needed",
     help_byok_p:
-      "Netstral calls the Mistral API (api.mistral.ai) directly from your browser, with your own API key. No data goes through an intermediary server; the key stays stored locally in the extension.",
+      "Netstral never calls the Mistral API: just be signed in to console.mistral.ai in this browser. The extension reads billing through the session cookie; no data goes through any intermediary server.",
     help_usage_h: "Account usage",
     help_usage_p:
-      "Signed in to console.mistral.ai in this browser, the extension reads the account's real usage (session cookie, no password asked) and shows it on the icon and in the pop-up. Without a session, it falls back to a local count of tokens sent through Netstral.",
+      "Signed in to console.mistral.ai in this browser, the extension reads the account's real usage (session cookie, no password asked) and shows it on the icon and in the pop-up. Without a session, no data is available (chat happens on chat.mistral.ai, outside the extension).",
     help_links_h: "Links",
-    help_links_keys: "Create an API key (La Plateforme)",
     help_links_sub: "Subscription (admin.mistral.ai)",
     help_links_src: "Source code (GitHub scabon/netstral)",
     help_project_h: "Project",

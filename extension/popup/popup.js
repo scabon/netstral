@@ -33,8 +33,6 @@ const langSelect = $("langSelect");
 const alertsEnabledEl = $("alertsEnabled");
 const alertPctInput = $("alertPct");
 const notifyOnResetEl = $("notifyOnReset");
-const apiKeyInput = $("apiKey");
-const btnToggleKey = $("btnToggleKey");
 
 const btnMenu = $("btn-menu");
 const menuEl = $("menu");
@@ -252,10 +250,6 @@ async function load() {
     buildAbout();
     NetstralI18n.applyTheme(state.settings?.theme ?? "system");
     document.documentElement.lang = state.lang ?? "fr";
-    if (apiKeyInput.value === "") {
-      const { apiKey } = await chrome.storage.local.get("apiKey");
-      apiKeyInput.value = apiKey ?? "";
-    }
     render(state);
   } catch (err) {
     consoDetailEl.textContent = `${t("err_prefix")} ${err.message}`;
@@ -347,7 +341,6 @@ function buildHelp() {
   const links = document.createElement("p");
   links.className = "links-list";
   const defs = [
-    ["help_links_keys", "https://console.mistral.ai/api-keys"],
     ["help_links_sub", "https://admin.mistral.ai/subscription"],
     ["help_links_src", "https://github.com/scabon/netstral"],
   ];
@@ -442,17 +435,6 @@ function buildAbout() {
 buildHelp();
 buildAbout();
 
-let keyTimer = null;
-apiKeyInput.addEventListener("input", () => {
-  clearTimeout(keyTimer);
-  keyTimer = setTimeout(() => {
-    chrome.storage.local.set({ apiKey: apiKeyInput.value.trim() });
-  }, 400);
-});
-btnToggleKey.addEventListener("click", () => {
-  apiKeyInput.type = apiKeyInput.type === "password" ? "text" : "password";
-});
-
 // ---------- Header / menu ----------
 
 btnMenu.addEventListener("click", (e) => {
@@ -490,8 +472,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
       changes.consoleCredits ||
       changes.accountBudget ||
       changes.subscriptionPlan ||
-      changes.settings ||
-      changes.apiKey)
+      changes.settings)
   ) {
     load();
   }

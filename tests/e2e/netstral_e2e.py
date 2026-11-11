@@ -16,7 +16,6 @@ Phases :
   C3. copie localhost de la pop-up (chrome mock) : rendu conso/projection/menu.
 
 Usage : python tests/e2e/netstral_e2e.py
-MISTRAL_API_KEY (optionnel) est juste seedé comme clé de chat (jamais affiché).
 """
 import functools
 import json
@@ -86,16 +85,12 @@ def make_profile(dest: Path) -> Path:
 
 
 def seed_storage(profile: Path) -> None:
-    key = os.environ.get("MISTRAL_API_KEY", "").strip() or "e2e-seed-key"
     now = time.localtime()
     month = f"{now.tm_year}-{now.tm_mon:02d}"
     seeds = {
-        "apiKey": key,
         "settings": {"monthlyBudgetTokens": 1000, "warnPct": 70, "dangerPct": 90},
         "usage": {month: {"prompt_tokens": 120, "completion_tokens": 30, "total_tokens": 150}},
         "accountBudget": None,
-        "models": ["mistral-small-latest"],
-        "conversation": [],
     }
     data_dir = profile / "browser-extension-data" / ADDON_ID
     data_dir.mkdir(parents=True, exist_ok=True)
@@ -112,7 +107,7 @@ POPUP_MOCK = """
   // Réponses via le DOM (monde isolé Marionette : window.* invisibles).
   // storage persistant : les réglages écrits par la pop-up sont relus au load.
   (function () {
-    const store = { apiKey: "test-key" };
+    const store = {};
     const state = {
       ok: true,
       version: "0.5.0-test",
@@ -132,8 +127,6 @@ POPUP_MOCK = """
         subscriptionPlanError: null,
       },
       localUsage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
-      hasApiKey: true,
-      modelCount: 3,
     };
     function refreshLang() {
       const s = store.settings || {};
@@ -143,11 +136,10 @@ POPUP_MOCK = """
         alertsEnabled: s.alertsEnabled !== false, alertPct: s.alertPct ?? 90, notifyOnReset: s.notifyOnReset !== false,
       };
       state.lang = NetstralI18n.resolveLang(s.lang, "fr-FR");
-      state.hasApiKey = Boolean(store.apiKey);
     }
     refreshLang();
     // #local : badge en comptage local ; #over : projection > 100 % ;
-    // #nokey : pas de clé API + plan non reconnu.
+    // #nokey : plan non reconnu.
     if (location.hash === "#local") {
       state.badge = { mode: "local", label: "comptage local", labelKey: "badge_local", pct: 15, color: "#1a7f37", spentTokens: 150, budgetTokens: 1000 };
     }
@@ -159,7 +151,6 @@ POPUP_MOCK = """
       };
     }
     if (location.hash === "#nokey") {
-      store.apiKey = "";
       state.account.subscriptionPlan = {
         fetchedAt: Date.now(), plan: null, planRaw: null, planPath: null,
         source: "admin-trpc:billing.subscriptions.current", rawPreview: "{}",
@@ -324,7 +315,6 @@ def main() -> int:
               const r = {};
               r.themeAvant = document.documentElement.dataset.theme;
               r.setTitleFr = document.querySelector('#view-settings h2').textContent;
-              r.keyFilled = document.getElementById('apiKey').value !== '';
               r.alerts = document.getElementById('alertsEnabled').checked;
               r.alertPct = String(document.getElementById('alertPct').value);
               r.notifyReset = document.getElementById('notifyOnReset').checked;
@@ -399,7 +389,7 @@ def main() -> int:
             """
         )
         check(
-            "C2: vues dédiées (⋮ -> Réglages/Aide/Changelog/À propos -> retour, icônes), dark + EN, drapeaux, alertes, clé",
+            "C2: vues dédiées (⋮ -> Réglages/Aide/Changelog/À propos -> retour, icônes), dark + EN, drapeaux, alertes",
             disp is not None
             and disp.get("mainVisible") is True
             and disp.get("settingsHidden") is True
@@ -448,8 +438,7 @@ def main() -> int:
             and "🇫🇷" in disp.get("flagLang", "")
             and disp.get("alerts") is True
             and disp.get("alertPct") == "90"
-            and disp.get("notifyReset") is True
-            and disp.get("keyFilled") is True,
+            and disp.get("notifyReset") is True,
             json.dumps(disp, ensure_ascii=False)[:1500],
         )
 
@@ -586,7 +575,7 @@ def main() -> int:
             and "100 %" in over["proj100"],
             json.dumps(over, ensure_ascii=False)[:220],
         )
-        # C3c : #nokey -> plan masqué, champ clé API vide dans les réglages
+        # C3c : #nokey -> plan non reconnu -> ligne plan masquée
         client.navigate(f"http://127.0.0.1:{HTTP_PORT}/i18n.js")
         time.sleep(0.4)
         client.navigate(f"http://127.0.0.1:{HTTP_PORT}/popup/popup.html#nokey")
@@ -595,16 +584,14 @@ def main() -> int:
             """
             return {
               planRowHidden: document.getElementById('plan-row').classList.contains('hidden'),
-              keyEmpty: document.getElementById('apiKey').value === '',
               settingsVisible: !document.querySelector('section.settings').classList.contains('hidden'),
             };
             """
         )
         check(
-            "C3c: sans clé -> champ clé API vide dans les réglages ; type de plan masqué",
+            "C3c: plan non reconnu -> type de plan masqué",
             nokey
             and nokey["planRowHidden"] is True
-            and nokey["keyEmpty"] is True
             and nokey["settingsVisible"] is True,
             json.dumps(nokey, ensure_ascii=False)[:200],
         )

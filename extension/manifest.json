@@ -26,7 +26,6 @@
     "notifications"
   ],
   "host_permissions": [
-    "https://api.mistral.ai/*",
     "https://admin.mistral.ai/*",
     "https://console.mistral.ai/*"
   ],

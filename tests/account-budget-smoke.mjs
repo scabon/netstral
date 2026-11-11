@@ -16,7 +16,6 @@ const messageListeners = [];
 const badgeCalls = [];
 const titleCalls = [];
 const stored = {
-  apiKey: "k",
   settings: { monthlyBudgetTokens: 100, warnPct: 70, dangerPct: 90 },
 };
 

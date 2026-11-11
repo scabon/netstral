@@ -16,7 +16,6 @@ const notifications = [];
 let pct = 95; // % renvoyé par le mock admin (vibe_budget)
 let resetAt = "2026-12-01T00:00:00Z";
 const stored = {
-  apiKey: "k",
   settings: {
     monthlyBudgetTokens: null,
     warnPct: 70,

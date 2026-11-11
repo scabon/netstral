@@ -550,8 +550,6 @@ async function getPopupState() {
     "subscriptionPlan",
     "subscriptionPlanError",
     "usage",
-    "apiKey",
-    "models",
   ]);
   const badge = await computeBadgeState();
   const localUsage = st.usage?.[monthKey()] ?? {
@@ -583,8 +581,6 @@ async function getPopupState() {
       subscriptionPlanError: st.subscriptionPlanError ?? null,
     },
     localUsage,
-    hasApiKey: Boolean(st.apiKey),
-    modelCount: Array.isArray(st.models) ? st.models.length : 0,
   };
 }
 

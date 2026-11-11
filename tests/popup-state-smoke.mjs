@@ -14,7 +14,6 @@ const code = readFileSync(
 
 const messageListeners = [];
 const stored = {
-  apiKey: "k",
   settings: { monthlyBudgetTokens: 100000, warnPct: 70, dangerPct: 90 },
   usage: { "2026-11": { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 } },
 };
@@ -167,7 +166,6 @@ results.push(
     if (st.badge?.total !== 255) p.push(`total=${st.badge?.total}`);
     if (st.account?.subscriptionPlan?.plan !== "pro") p.push(`plan=${st.account?.subscriptionPlan?.plan}`);
     if (st.version !== "0.3.0") p.push(`version=${st.version}`);
-    if (st.hasApiKey !== true) p.push("hasApiKey=false");
     if (st.localUsage?.total_tokens !== 15) p.push("localUsage faux");
     return p;
   })
