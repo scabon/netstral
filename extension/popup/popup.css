@@ -11,6 +11,9 @@
   --error-bg: #fdecea;
   --error-text: #b3261e;
   --error-border: #f5c6c1;
+  --hint-bg: #e8f0fe;
+  --hint-text: #1a56db;
+  --hint-border: #c5d8fb;
   --menu-shadow: rgba(0, 0, 0, 0.12);
   --hover: #f0f0f0;
   --hatch-a: #fdecea;
@@ -28,6 +31,9 @@
   --error-bg: #3a1f1d;
   --error-text: #ff8a80;
   --error-border: #5a2f2b;
+  --hint-bg: #1c2b4a;
+  --hint-text: #9ec1ff;
+  --hint-border: #2c3f66;
   --menu-shadow: rgba(0, 0, 0, 0.5);
   --hover: #2a2a3a;
   --hatch-a: #3a1f1d;
@@ -267,6 +273,20 @@ button.mini:hover {
 
 .error a {
   color: var(--error-text);
+}
+
+.hint {
+  background: var(--hint-bg);
+  color: var(--hint-text);
+  border: 1px solid var(--hint-border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.hint a {
+  color: var(--hint-text);
 }
 
 .hidden {

@@ -205,13 +205,14 @@ function render(state) {
     accResetInEl.classList.add("hidden");
   }
 
-  // Erreur de session affichée seulement si AUCUNE source compte n'est
-  // disponible.
+  // Bandeau « connectez-vous » dès qu'AUCUNE source compte n'est disponible ;
+  // avec le détail de l'erreur technique quand on en a une (style error),
+  // sinon simple invitation avec lien (style hint).
   const hasAccountSource = b?.mode === "account";
   const err = hasAccountSource
     ? null
     : acc.consoleCreditsError ?? acc.accountBudgetError ?? acc.subscriptionPlanError ?? null;
-  if (err) {
+  if (!hasAccountSource) {
     accErrorEl.innerHTML = "";
     const link = Object.assign(document.createElement("a"), {
       href: "https://console.mistral.ai/",
@@ -219,11 +220,12 @@ function render(state) {
       rel: "noreferrer",
       textContent: "console.mistral.ai",
     });
-    const parts = t("session_error_connect", { err, link: "" }).split("{link}");
+    const key = err ? "session_error_connect" : "session_connect_hint";
+    const parts = t(key, { err: err ?? "", link: "" }).split("{link}");
     accErrorEl.append(parts[0], link, parts[1] ?? "");
-    accErrorEl.classList.remove("hidden");
+    accErrorEl.className = err ? "error" : "hint";
   } else {
-    accErrorEl.classList.add("hidden");
+    accErrorEl.className = "error hidden";
   }
 
   // --- Usage local ---

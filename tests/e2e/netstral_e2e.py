@@ -524,12 +524,15 @@ def main() -> int:
               projHidden: document.getElementById('projection').classList.contains('hidden'),
               markLabel: document.getElementById('proj-mark-label').textContent,
               fillWidth: document.getElementById('proj-fill').style.width,
+              hintVisible: !document.getElementById('acc-error').classList.contains('hidden'),
+              hintClass: document.getElementById('acc-error').className,
+              hintLink: (document.querySelector('#acc-error a') || {}).href || '',
             };
             """
         )
         norm = lambda s: (s or "").replace(" ", "").replace("\u202f", "").replace("\u00a0", "")
         check(
-            "C3b: repli local -> 15%, 150/1000 tokens, section local visible, projection graphique",
+            "C3b: repli local -> 15%, 150/1000 tokens, section local visible, projection graphique, bandeau connexion",
             pop_local
             and norm(pop_local["pct"]) == "15%"
             and "150" in pop_local["detail"] and "1000" in norm(pop_local["detail"])
@@ -537,7 +540,10 @@ def main() -> int:
             and norm(pop_local["tokens"]) == "15"
             and pop_local["projHidden"] is False
             and pop_local["markLabel"].startswith("~") and pop_local["markLabel"].endswith(" %")
-            and pop_local["fillWidth"] == "15%",
+            and pop_local["fillWidth"] == "15%"
+            and pop_local["hintVisible"] is True
+            and pop_local["hintClass"] == "hint"
+            and "console.mistral.ai" in pop_local["hintLink"],
             json.dumps(pop_local, ensure_ascii=False)[:200],
         )
 
