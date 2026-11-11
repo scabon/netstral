@@ -80,6 +80,7 @@ const BUDGET_TTL_MS = 60 * 60 * 1000; // 1 h
 const BUDGET_ALARM = "netstral-budget-refresh";
 
 async function fetchJsonWithSession(url) {
+  const t = tFor(await getSettings());
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 10000);
   let response;
@@ -89,33 +90,34 @@ async function fetchJsonWithSession(url) {
       signal: ctrl.signal,
     });
   } catch (err) {
-    return { ok: false, error: `Réseau : ${err.message}` };
+    return { ok: false, error: t("err_network", { msg: err.message }) };
   } finally {
     clearTimeout(timer);
   }
   if (response.redirected && response.url.includes("auth.mistral.ai")) {
-    return { ok: false, error: "Session Mistral absente/expirée (redirigé vers la login)." };
+    return { ok: false, error: t("err_session_redirect") };
   }
   if (response.status === 401 || response.status === 403) {
-    return { ok: false, error: `Session Mistral absente/expirée (HTTP ${response.status}).` };
+    return { ok: false, error: t("err_session_http", { status: response.status }) };
   }
   if (!response.ok) {
-    return { ok: false, error: `HTTP ${response.status}` };
+    return { ok: false, error: t("err_http", { status: response.status }) };
   }
   try {
     return { ok: true, json: await response.json() };
   } catch {
-    return { ok: false, error: "Réponse non-JSON (session invalide ?)" };
+    return { ok: false, error: t("err_not_json") };
   }
 }
 
 // Crédits PAYG de la console (source prioritaire).
 async function fetchConsoleCredits() {
+  const t = tFor(await getSettings());
   const res = await fetchJsonWithSession(CREDITS_URL);
   if (!res.ok) return res;
   const data = res.json;
   if (!data || typeof data !== "object" || Array.isArray(data)) {
-    return { ok: false, error: "Format de réponse inattendu (credits)." };
+    return { ok: false, error: t("err_bad_format_credits") };
   }
   const num = (v) => (typeof v === "number" ? v : null);
   const wallet = num(data.wallet_amount);
@@ -172,11 +174,12 @@ function safePreview(data) {
 //     admin.mistral.ai/subscription) vit dans vibe_budget ; le top-level
 //     ne reflète que l'allocation API.
 async function fetchAccountBudget() {
+  const t = tFor(await getSettings());
   const res = await fetchJsonWithSession(BUDGET_URL);
   if (!res.ok) return res;
   const data = res.json?.result?.data?.json ?? res.json?.result?.data ?? null;
   if (!data || typeof data !== "object") {
-    return { ok: false, error: "Format de réponse inattendu." };
+    return { ok: false, error: t("err_bad_format") };
   }
   const pick = (o) =>
     o && typeof o === "object" && typeof o.usage_percentage === "number"
@@ -197,7 +200,7 @@ async function fetchAccountBudget() {
     rawPreview: safePreview(data),
   };
   if (!record.vibe && !record.api) {
-    return { ok: false, error: "Aucun budget exploitable dans la réponse." };
+    return { ok: false, error: t("err_no_budget") };
   }
   await chrome.storage.local.set({ accountBudget: record });
   return { ok: true, accountBudget: record };
@@ -263,6 +266,7 @@ function classifyPlan(strings) {
 }
 
 async function fetchSubscriptionPlan() {
+  const t = tFor(await getSettings());
   let lastError = null;
   for (const proc of SUBSCRIPTION_PROCS) {
     const res = await fetchJsonWithSession(subscriptionUrl(proc));
@@ -273,7 +277,7 @@ async function fetchSubscriptionPlan() {
     const data =
       res.json?.result?.data?.json ?? res.json?.result?.data ?? res.json ?? null;
     if (!data || typeof data !== "object") {
-      lastError = "Format de réponse inattendu.";
+      lastError = t("err_bad_format");
       continue;
     }
     const strings = flattenStrings(data);
@@ -289,9 +293,9 @@ async function fetchSubscriptionPlan() {
     };
     await chrome.storage.local.set({ subscriptionPlan: record });
     if (found) return { ok: true, subscriptionPlan: record };
-    lastError = "Réponse reçue mais aucun nom de plan reconnu.";
+    lastError = t("err_no_plan");
   }
-  return { ok: false, error: lastError ?? "Aucune réponse exploitable." };
+  return { ok: false, error: lastError ?? t("err_no_response") };
 }
 
 async function refreshBudgetAndBadge() {
