@@ -169,6 +169,10 @@ POPUP_MOCK = """
     if (location.hash === "#refreshko") {
       state.account.consoleCreditsError = "Session Mistral absente/expirée (HTTP 401).";
     }
+    // #planerr : badge account OK, sonde du plan seule en échec -> PAS de warning
+    if (location.hash === "#planerr") {
+      state.account.subscriptionPlanError = "Response received but no plan name recognized.";
+    }
     window.chrome = {
       storage: {
         local: {
@@ -639,6 +643,27 @@ def main() -> int:
             and "401" in rko["warnText"]
             and "console.mistral.ai" in rko["warnLink"],
             json.dumps(rko, ensure_ascii=False)[:200],
+        )
+
+        # C3f : #planerr -> sonde du plan en échec seule, badge account OK -> pas de bandeau
+        client.navigate(f"http://127.0.0.1:{HTTP_PORT}/i18n.js")
+        time.sleep(0.4)
+        client.navigate(f"http://127.0.0.1:{HTTP_PORT}/popup/popup.html#planerr")
+        time.sleep(0.8)
+        perr = client.execute_script(
+            """
+            return {
+              pct: document.getElementById('conso-pct').textContent,
+              errHidden: document.getElementById('acc-error').classList.contains('hidden'),
+            };
+            """
+        )
+        check(
+            "C3f: erreur de la sonde du plan seule (badge OK) -> aucun bandeau",
+            perr
+            and norm(perr["pct"]) == "21%"
+            and perr["errHidden"] is True,
+            json.dumps(perr, ensure_ascii=False)[:200],
         )
 
         menu = client.execute_script(

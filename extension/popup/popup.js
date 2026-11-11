@@ -211,8 +211,12 @@ function render(state) {
   //   warning « les valeurs affichées sont les dernières connues » ;
   // - tout OK -> rien.
   const hasAccountSource = b?.mode === "account";
-  const err =
-    acc.consoleCreditsError ?? acc.accountBudgetError ?? acc.subscriptionPlanError ?? null;
+  // En mode account (badge alimenté par crédits/budget frais), une erreur de
+  // la sonde du plan ne déclenche PAS le warning : seules les erreurs des
+  // sources du badge comptent. Hors mode account, toutes les erreurs comptent.
+  const err = hasAccountSource
+    ? (acc.consoleCreditsError ?? acc.accountBudgetError ?? null)
+    : (acc.consoleCreditsError ?? acc.accountBudgetError ?? acc.subscriptionPlanError ?? null);
   const link = Object.assign(document.createElement("a"), {
     href: "https://console.mistral.ai/",
     target: "_blank",
