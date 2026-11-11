@@ -1,8 +1,7 @@
 // Netstral - service worker MV3
-// Gère les appels API Mistral (chat en streaming SSE) et relaie les tokens
-// vers le side panel via un port de longue durée.
-
-const API_BASE = "https://api.mistral.ai/v1";
+// Service worker : badge de consommation (usage réel du compte Mistral via la
+// session console, fallback comptage local), alertes à seuil, snapshot pop-up.
+// Pas de chat interne — le bouton de la pop-up renvoie vers chat.mistral.ai.
 
 // i18n embarqué : via background.scripts (Firefox) ou importScripts (Chrome MV3)
 if (typeof NetstralI18n === "undefined" && typeof importScripts === "function") {
@@ -32,8 +31,8 @@ function resolveLangFor(settings) {
 }
 
 // Le clic sur l'icône ouvre la pop-up (action.default_popup dans le manifest).
-// Le chat ne passe plus par le side panel depuis la pop-up (bouton 💬 ->
-// chat.mistral.ai) ; la sidebar reste ouvrable depuis le menu du navigateur.
+// Le chat se fait sur chat.mistral.ai (bouton 💬 de la pop-up) : l'extension
+// n'a plus de side panel / sidebar, le navigateur en fournit déjà un en natif.
 
 chrome.runtime.onInstalled.addListener(() => {
   ensureBudgetAlarm();
@@ -62,11 +61,6 @@ chrome.storage.onChanged.addListener((changes, area) => {
     updateBadge();
   }
 });
-
-async function getApiKey() {
-  const { apiKey } = await chrome.storage.local.get("apiKey");
-  return apiKey;
-}
 
 // ---------- Usage réel du compte (session console) ----------
 // Deux quantités distinctes, toutes deux lues avec le cookie de session
@@ -355,19 +349,6 @@ async function getSettings() {
   return { ...DEFAULT_SETTINGS, ...(settings ?? {}) };
 }
 
-// Cumule le usage d'un tour dans l'entrée du mois courant.
-async function recordUsage(usage) {
-  if (!usage) return;
-  const key = monthKey();
-  const { usage: all = {} } = await chrome.storage.local.get("usage");
-  const cur = all[key] ?? { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
-  cur.prompt_tokens += usage.prompt_tokens ?? 0;
-  cur.completion_tokens += usage.completion_tokens ?? 0;
-  cur.total_tokens += usage.total_tokens ?? 0;
-  all[key] = cur;
-  await chrome.storage.local.set({ usage: all });
-}
-
 function badgeColor(pct, settings) {
   return pct >= settings.dangerPct
     ? "#b3261e" // rouge
@@ -606,110 +587,6 @@ async function getPopupState() {
     modelCount: Array.isArray(st.models) ? st.models.length : 0,
   };
 }
-
-// ---------- Chat en streaming ----------
-
-async function streamChat(port, apiKey, { model, messages }) {
-  let response;
-  try {
-    response = await fetch(`${API_BASE}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "text/event-stream",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        stream: true,
-      }),
-    });
-  } catch (err) {
-    port.postMessage({
-      type: "error",
-      message: `Impossible de joindre api.mistral.ai : ${err.message}`,
-    });
-    return;
-  }
-
-  if (!response.ok) {
-    let detail = `${response.status} ${response.statusText}`;
-    try {
-      const body = await response.json();
-      detail = body?.message ?? detail;
-    } catch {
-      // corps non-JSON, on garde le code HTTP
-    }
-    port.postMessage({ type: "error", message: `Mistral API : ${detail}` });
-    return;
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let usage = null;
-  let done = false;
-
-  while (!done) {
-    const { value, done: streamDone } = await reader.read();
-    if (streamDone) break;
-    buffer += decoder.decode(value, { stream: true });
-
-    let sep;
-    while ((sep = buffer.indexOf("\n")) !== -1) {
-      const line = buffer.slice(0, sep).trim();
-      buffer = buffer.slice(sep + 1);
-      if (!line.startsWith("data:")) continue;
-      const data = line.slice(5).trim();
-      if (data === "[DONE]") {
-        done = true;
-        break;
-      }
-      try {
-        const chunk = JSON.parse(data);
-        const delta = chunk.choices?.[0]?.delta?.content ?? "";
-        if (delta) port.postMessage({ type: "delta", content: delta });
-        if (chunk.usage) usage = chunk.usage;
-      } catch {
-        // chunk malformé : on ignore et on continue
-      }
-    }
-  }
-
-  port.postMessage({ type: "done", usage });
-  await recordUsage(usage);
-  await updateBadge();
-  // refraîchit l'usage réel du compte, sans marteler les endpoints (throttle 5 min)
-  const { accountBudget, consoleCredits } = await chrome.storage.local.get([
-    "accountBudget",
-    "consoleCredits",
-  ]);
-  const last = Math.max(
-    accountBudget?.fetchedAt ?? 0,
-    consoleCredits?.fetchedAt ?? 0
-  );
-  if (Date.now() - last > 5 * 60 * 1000) {
-    refreshBudgetAndBadge().catch(() => {});
-  }
-}
-
-// ---------- Ports (side panel) ----------
-
-chrome.runtime.onConnect.addListener((port) => {
-  if (port.name !== "netstral-chat") return;
-
-  port.onMessage.addListener(async (msg) => {
-    if (msg.type !== "chat") return;
-
-    const apiKey = await getApiKey();
-    if (!apiKey) {
-      port.postMessage({ type: "error", messageKey: "sp_err_no_key" });
-      return;
-    }
-    await streamChat(port, apiKey, msg.payload);
-  });
-});
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === "getPopupState") {

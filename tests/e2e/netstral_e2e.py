@@ -4,15 +4,13 @@
 Suit la recette schatzy projects/firefox-marionette-e2e.md (harness wagonBAR) :
 env MOZ_REMOTE_ALLOW_SYSTEM_ACCESS, badge lu via le nœud toolbar "-BAP",
 seed de storage.js avec le backend IDB désactivé, pages moz-extension:// NON
-navigables -> sidepanel/options testés sur copie localhost avec chrome mock.
+navigables -> la pop-up est testée sur copie localhost avec chrome mock.
 
 Phases :
-  A. build xpi + install temporaire -> le manifest MV3 (sidebar_action +
-     background.scripts) charge, uuid résoluble.
+  A. build xpi + install temporaire -> le manifest MV3 (background.scripts)
+     charge, uuid résoluble.
   B. storage.js seedé (settings + usage) -> badge « 15% » (comptage local) ;
-     clic sur l'icône -> pop-up (default_popup) ; la sidebar s'ouvre à
-     l'installation (sidebar_action.open_at_install).
-  C. copie localhost du sidepanel (chrome mock) : streaming + markdown + meta.
+     manifest embarqué : default_popup déclaré, AUCUN side_panel/sidebar_action.
   C2. copie localhost de la pop-up : réglages (thème dark, langue EN avec
       drapeaux, alertes, clé API pré-remplie).
   C3. copie localhost de la pop-up (chrome mock) : rendu conso/projection/menu.
@@ -108,58 +106,6 @@ class QuietHandler(SimpleHTTPRequestHandler):
     def log_message(self, *a):
         pass
 
-
-SIDEPANEL_MOCK = """
-<script>
-  window.__chatRequests = [];
-  window.__portListeners = [];
-  (function () {
-    const store = {
-      apiKey: 'test-key',
-      models: ['mistral-small-latest'],
-      defaultModel: 'mistral-small-latest',
-      accountBudget: null,
-    };
-    window.chrome = {
-      storage: {
-        local: {
-          get: async (keys) => {
-            const want = Array.isArray(keys) ? keys : [keys];
-            const out = {};
-            for (const k of want) if (k in store) out[k] = store[k];
-            return out;
-          },
-          set: async () => {},
-        },
-      },
-      runtime: {
-        connect: () => ({
-          postMessage: (m) => __chatRequests.push(m),
-          onMessage: { addListener: (fn) => __portListeners.push(fn) },
-          onDisconnect: { addListener: () => {} },
-        }),
-        openOptionsPage: () => {},
-      },
-    };
-  })();
-</script>
-<script>
-  // réponses SSE simulées pour chaque chat request
-  (function () {
-    const answer = (req) => {
-      req.__answered = true;
-      for (const fn of window.__portListeners) {
-        fn({ type: 'delta', content: 'Salut' });
-        fn({ type: 'delta', content: ' **parent**' });
-        fn({ type: 'done', usage: { prompt_tokens: 9, completion_tokens: 3 } });
-      }
-    };
-    setInterval(() => {
-      for (const r of window.__chatRequests) if (!r.__answered) answer(r);
-    }, 200);
-  })();
-</script>
-"""
 
 POPUP_MOCK = """
 <script>
@@ -262,16 +208,7 @@ def build_srv(srv_dir: Path) -> None:
     srv_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy(EXT_DIR / "i18n.js", srv_dir / "i18n.js")
     shutil.copy(EXT_DIR / "changelog.js", srv_dir / "changelog.js")
-    shutil.copytree(EXT_DIR / "sidepanel", srv_dir / "sidepanel")
     shutil.copytree(EXT_DIR / "popup", srv_dir / "popup")
-    sp = (srv_dir / "sidepanel" / "sidepanel.html").read_text(encoding="utf-8")
-    (srv_dir / "sidepanel" / "sidepanel.html").write_text(
-        sp.replace(
-            '<script type="module" src="sidepanel.js"></script>',
-            SIDEPANEL_MOCK + '<script type="module" src="sidepanel.js"></script>',
-        ),
-        encoding="utf-8",
-    )
     pp = (srv_dir / "popup" / "popup.html").read_text(encoding="utf-8")
     (srv_dir / "popup" / "popup.html").write_text(
         pp.replace(
@@ -324,7 +261,7 @@ def main() -> int:
             check("A: install temporaire + uuid", False, str(e)[:200])
             return 1
 
-        # ---- Phase B : badge + sidebar
+        # ---- Phase B : badge + manifest embarqué
         time.sleep(2.0)
         client.set_context("chrome")
 
@@ -361,66 +298,24 @@ def main() -> int:
 
         # En headless, un clic synthétique sur le bouton n'ouvre pas de
         # panel pop-up inspectable ; on valide à la place :
-        # - manifest embarqué : action.default_popup (check ci-dessus, Python) ;
-        # - la sidebar de l'extension s'ouvre à l'installation
-        #   (sidebar_action.open_at_install) ;
-        # - le rendu/boutons de la pop-up par la phase C3 ci-dessous.
-        after = chrome_script(
-            """
-            const box = win.document.getElementById('sidebar-box');
-            if (!box) return null;
-            const src = box.getAttribute('src') || '';
-            const cmd = box.getAttribute('sidebarcommand') || '';
-            const browser = box.querySelector('browser');
-            return {
-              hidden: box.hidden,
-              cmd,
-              isExt:
-                cmd.endsWith('-sidebar-action') ||
-                src.startsWith('moz-extension://') ||
-                (browser && (browser.getAttribute('src') || '').startsWith('moz-extension://')),
-              src: src.slice(0, 45),
-            };
-            """
-        )
-        print("B: sidebar (open_at_install):", after)
+        # - manifest embarqué : action.default_popup (check ci-dessus) ;
+        # - AUCUN side panel : ni side_panel ni sidebar_action ni la
+        #   permission sidePanel dans le manifest embarqué ;
+        # - le rendu/boutons de la pop-up par les phases C2/C3 ci-dessous.
+        with zipfile.ZipFile(xpi) as z:
+            manifest = json.loads(z.read("manifest.json"))
         check(
-            "B: sidebar extension active à l'installation (open_at_install)",
-            after is not None and not after["hidden"] and after["isExt"],
-            f"after={after}",
-        )
-
-        # ---- Phase C : copie localhost sidepanel (chrome mock)
-        client.set_context("content")
-        client.navigate(f"http://127.0.0.1:{HTTP_PORT}/sidepanel/sidepanel.html")
-        time.sleep(0.8)
-        client.execute_script(
-            """
-            const p = document.getElementById('prompt');
-            p.value = 'test streaming';
-            document.getElementById('btn-send').click();
-            """
-        )
-        time.sleep(2.0)
-        sp = client.execute_script(
-            """
-            return {
-              assistant: (document.querySelector('.msg.assistant') || {}).textContent,
-              meta: (document.querySelector('.meta') || {}).textContent,
-              strong: !!document.querySelector('.msg.assistant strong'),
-            };
-            """
-        )
-        check(
-            "C: streaming + markdown + meta (page localhost)",
-            sp
-            and "Salut" in (sp.get("assistant") or "")
-            and sp.get("strong")
-            and "9 tokens in" in (sp.get("meta") or ""),
-            json.dumps(sp, ensure_ascii=False)[:160],
+            "B: manifest embarqué sans side_panel / sidebar_action / permission sidePanel",
+            "side_panel" not in manifest
+            and "sidebar_action" not in manifest
+            and "sidePanel" not in manifest.get("permissions", []),
+            json.dumps(
+                {k: manifest.get(k) for k in ("side_panel", "sidebar_action", "permissions")}
+            ),
         )
 
         # ---- Phase C2 : réglages dans la pop-up (thème/langue/alertes/clé)
+        client.set_context("content")
         client.navigate(f"http://127.0.0.1:{HTTP_PORT}/popup/popup.html")
         time.sleep(0.8)
         disp = client.execute_script(
@@ -559,7 +454,7 @@ def main() -> int:
         )
 
         # ---- Phase C3 : copie localhost de la pop-up (chrome mock)
-        client.navigate(f"http://127.0.0.1:{HTTP_PORT}/sidepanel/sidepanel.html")
+        client.navigate(f"http://127.0.0.1:{HTTP_PORT}/i18n.js")
         time.sleep(0.4)
         client.navigate(f"http://127.0.0.1:{HTTP_PORT}/popup/popup.html")
         time.sleep(0.8)
@@ -626,7 +521,7 @@ def main() -> int:
 
         # C3b : repli comptage local (#local) -> section local visible.
         # (détour par une autre page : même URL + hash ne rechargerait pas)
-        client.navigate(f"http://127.0.0.1:{HTTP_PORT}/options/options.html")
+        client.navigate(f"http://127.0.0.1:{HTTP_PORT}/i18n.js")
         time.sleep(0.4)
         client.navigate(f"http://127.0.0.1:{HTTP_PORT}/popup/popup.html#local")
         time.sleep(0.8)
@@ -658,7 +553,7 @@ def main() -> int:
         )
 
         # C3d : #over -> projection > 100 % : zone hachurée, marqueur rouge
-        client.navigate(f"http://127.0.0.1:{HTTP_PORT}/options/options.html")
+        client.navigate(f"http://127.0.0.1:{HTTP_PORT}/i18n.js")
         time.sleep(0.4)
         client.navigate(f"http://127.0.0.1:{HTTP_PORT}/popup/popup.html#over")
         time.sleep(0.8)
@@ -692,7 +587,7 @@ def main() -> int:
             json.dumps(over, ensure_ascii=False)[:220],
         )
         # C3c : #nokey -> plan masqué, champ clé API vide dans les réglages
-        client.navigate(f"http://127.0.0.1:{HTTP_PORT}/sidepanel/sidepanel.html")
+        client.navigate(f"http://127.0.0.1:{HTTP_PORT}/i18n.js")
         time.sleep(0.4)
         client.navigate(f"http://127.0.0.1:{HTTP_PORT}/popup/popup.html#nokey")
         time.sleep(0.8)

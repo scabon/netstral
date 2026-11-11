@@ -101,7 +101,6 @@ const chromeMock = {
     onConnect: { addListener: () => {} },
     onMessage: { addListener: (fn) => messageListeners.push(fn) },
   },
-  sidePanel: { setPanelBehavior: async () => {} },
   action: {
     setBadgeText: async ({ text }) => badgeCalls.push(["text", text]),
     setBadgeBackgroundColor: async ({ color }) => badgeCalls.push(["bg", color]),

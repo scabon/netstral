@@ -115,7 +115,6 @@ const chromeMock = {
     getManifest: () => ({ version: "0.3.0" }),
   },
   tabs: { query: async () => [{ windowId: 1 }] },
-  sidePanel: { open: async () => {} },
   action: {
     setBadgeText: async () => {},
     setBadgeBackgroundColor: async () => {},

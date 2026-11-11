@@ -73,14 +73,6 @@ const I18N_MESSAGES = {
     set_notify_reset: "Me notifier à la réinitialisation du quota",
     notif_reset_title: "Netstral — quota réinitialisé",
     notif_reset_body: "Nouveau cycle de facturation : la consommation repart de 0.",
-    // sidepanel
-    sp_placeholder: "Message à Netstral… (Entrée pour envoyer, Maj+Entrée pour un saut de ligne)",
-    sp_send: "Envoyer",
-    sp_new_chat: "Nouvelle conversation",
-    sp_err_no_key: "Aucune clé API configurée. Ouvrez les options de Netstral pour la coller.",
-    sp_err_no_key_local: "Configurez votre clé API Mistral dans les réglages de la pop-up.",
-    sp_hint: "Posez une question à Netstral.",
-    sp_meta: "{in} tokens in, {out} tokens out",
     // aide (contenu de la vue Aide)
     help_lead:
       "Discutez avec les modèles Mistral depuis n'importe quel onglet, avec un badge de consommation de tokens sur l'icône.",
@@ -96,7 +88,7 @@ const I18N_MESSAGES = {
     help_links_src: "Code source (GitHub scabon/netstral)",
     help_project_h: "Projet",
     help_project_p:
-      "Projet personnel de la famille Cabon14 — compagnon navigateur de Monstral (WearOS). Chrome/Edge (Manifest V3) et Firefox (sidebar). Non publié sur les stores à ce stade.",
+      "Projet personnel de la famille Cabon14 — compagnon navigateur de Monstral (WearOS). Chrome/Edge (Manifest V3) et Firefox. Non publié sur les stores à ce stade.",
     // à propos (vue À propos, style wagonBAR : site / support / dons)
     about_tagline:
       "Extension navigateur pour discuter avec les modèles Mistral, avec un badge de consommation de tokens sur l'icône.",
@@ -178,13 +170,6 @@ const I18N_MESSAGES = {
     set_notify_reset: "Notify me when the quota resets",
     notif_reset_title: "Netstral — quota reset",
     notif_reset_body: "New billing cycle: usage is back to 0.",
-    sp_placeholder: "Message to Netstral… (Enter to send, Shift+Enter for a new line)",
-    sp_send: "Send",
-    sp_new_chat: "New conversation",
-    sp_err_no_key: "No API key configured. Open Netstral's settings to paste it.",
-    sp_err_no_key_local: "Configure your Mistral API key in the pop-up settings.",
-    sp_hint: "Ask Netstral anything.",
-    sp_meta: "{in} tokens in, {out} tokens out",
     help_lead:
       "Chat with Mistral models from any tab, with a token-usage badge on the toolbar icon.",
     help_byok_h: "BYOK — Bring Your Own Key",
@@ -199,7 +184,7 @@ const I18N_MESSAGES = {
     help_links_src: "Source code (GitHub scabon/netstral)",
     help_project_h: "Project",
     help_project_p:
-      "Cabon14 family personal project — browser companion of Monstral (WearOS). Chrome/Edge (Manifest V3) and Firefox (sidebar). Not published on stores yet.",
+      "Cabon14 family personal project — browser companion of Monstral (WearOS). Chrome/Edge (Manifest V3) and Firefox. Not published on stores yet.",
     about_tagline:
       "Browser extension to chat with Mistral models, with a token-usage badge on the toolbar icon.",
     about_note:
