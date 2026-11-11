@@ -469,7 +469,7 @@ def main() -> int:
               r.helpDisplay = getComputedStyle(document.getElementById('view-help')).display;
               r.mainDisplayHelp = getComputedStyle(document.getElementById('view-main')).display;
               r.helpSections = document.querySelectorAll('#helpContent h3').length;
-              r.helpGithub = !!document.querySelector('#helpContent a[href*="github.com/scabon/webstral"]');
+              r.helpGithub = !!document.querySelector('#helpContent a[href*="github.com/scabon/netstral"]');
               document.getElementById('btn-back-help').click();
               r.backFromHelp = !document.getElementById('view-main').classList.contains('hidden');
               r.helpDisplayBack = getComputedStyle(document.getElementById('view-help')).display;

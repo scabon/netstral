@@ -93,7 +93,7 @@ const I18N_MESSAGES = {
     help_links_h: "Liens",
     help_links_keys: "Créer une clé API (La Plateforme)",
     help_links_sub: "Abonnement (admin.mistral.ai)",
-    help_links_src: "Code source (GitHub scabon/webstral)",
+    help_links_src: "Code source (GitHub scabon/netstral)",
     help_project_h: "Projet",
     help_project_p:
       "Projet personnel de la famille Cabon14 — compagnon navigateur de Monstral (WearOS). Chrome/Edge (Manifest V3) et Firefox (sidebar). Non publié sur les stores à ce stade.",
@@ -196,7 +196,7 @@ const I18N_MESSAGES = {
     help_links_h: "Links",
     help_links_keys: "Create an API key (La Plateforme)",
     help_links_sub: "Subscription (admin.mistral.ai)",
-    help_links_src: "Source code (GitHub scabon/webstral)",
+    help_links_src: "Source code (GitHub scabon/netstral)",
     help_project_h: "Project",
     help_project_p:
       "Cabon14 family personal project — browser companion of Monstral (WearOS). Chrome/Edge (Manifest V3) and Firefox (sidebar). Not published on stores yet.",

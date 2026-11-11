@@ -349,7 +349,7 @@ function buildHelp() {
   const defs = [
     ["help_links_keys", "https://console.mistral.ai/api-keys"],
     ["help_links_sub", "https://admin.mistral.ai/subscription"],
-    ["help_links_src", "https://github.com/scabon/webstral"],
+    ["help_links_src", "https://github.com/scabon/netstral"],
   ];
   for (const [k, href] of defs) {
     const a = document.createElement("a");
