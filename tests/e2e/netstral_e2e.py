@@ -108,6 +108,14 @@ POPUP_MOCK = """
   // storage persistant : les réglages écrits par la pop-up sont relus au load.
   (function () {
     const store = {};
+    // tools/screenshot.py pilote thème/langue via ?theme=&lang= (sinon system)
+    const q = new URLSearchParams(location.search);
+    if (q.get("theme") || q.get("lang")) {
+      store.settings = {
+        theme: q.get("theme") || "system",
+        lang: q.get("lang") || "system",
+      };
+    }
     const state = {
       ok: true,
       version: "0.5.0-test",
