@@ -103,6 +103,7 @@ const I18N_MESSAGES = {
       "Extension navigateur pour discuter avec les modèles Mistral, avec un badge de consommation de tokens sur l'icône.",
     about_note:
       "Projet personnel, non affilié à Mistral. Vos données restent dans votre navigateur.",
+    about_version: "Version {v}",
     made_by: "Créé par :",
     about_site: "cabon14.com",
     support_label: "Assistance :",
@@ -207,6 +208,7 @@ const I18N_MESSAGES = {
       "Browser extension to chat with Mistral models, with a token-usage badge on the toolbar icon.",
     about_note:
       "Personal project, not affiliated with Mistral. Your data stays in your browser.",
+    about_version: "Version {v}",
     made_by: "Made by:",
     about_site: "cabon14.com",
     support_label: "Support:",

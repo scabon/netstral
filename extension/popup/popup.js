@@ -226,12 +226,13 @@ function render(state) {
   if (!hasAccountSource) {
     accErrorEl.innerHTML = "";
     const key = err ? "session_error_connect" : "session_connect_hint";
-    const parts = t(key, { err: err ?? "", link: "" }).split("{link}");
+    // Ne pas substituer {link} : il doit rester dans la chaîne pour le split.
+    const parts = t(key, { err: err ?? "" }).split("{link}");
     accErrorEl.append(parts[0], link, parts[1] ?? "");
     accErrorEl.className = err ? "error" : "hint";
   } else if (err) {
     accErrorEl.innerHTML = "";
-    const parts = t("refresh_failed_cached", { err, link: "" }).split("{link}");
+    const parts = t("refresh_failed_cached", { err }).split("{link}");
     accErrorEl.append(parts[0], link, parts[1] ?? "");
     accErrorEl.className = "warn";
   } else {
@@ -387,14 +388,17 @@ function buildAbout() {
   const frag = document.createDocumentFragment();
 
   const brand = document.createElement("p");
-  brand.className = "brand-line";
+  brand.className = "about-name";
+  brand.textContent = t("appName");
   let ver = "";
   try {
     ver = chrome.runtime.getManifest().version;
   } catch (e) {
     // page de test (e2e localhost)
   }
-  brand.textContent = `${t("appName")}${ver ? ` v${ver}` : ""}`;
+  const versionLine = document.createElement("p");
+  versionLine.className = "about-version";
+  versionLine.textContent = ver ? t("about_version", { v: ver }) : "";
 
   const tagline = document.createElement("p");
   tagline.textContent = t("about_tagline");
@@ -404,26 +408,26 @@ function buildAbout() {
   note.textContent = t("about_note");
 
   const siteLine = document.createElement("p");
-  siteLine.className = "about-line";
   const madeBy = document.createElement("span");
   madeBy.textContent = `${t("made_by")} `;
   const site = document.createElement("a");
   site.href = "https://cabon14.com/";
   site.target = "_blank";
   site.rel = "noreferrer";
+  site.className = "about-site";
   site.textContent = t("about_site");
   siteLine.append(madeBy, site);
 
   const supportLine = document.createElement("p");
-  supportLine.className = "about-line";
   const supportLabel = document.createElement("span");
   supportLabel.textContent = `${t("support_label")} `;
   const support = document.createElement("a");
   support.href = `mailto:${t("support_email")}`;
+  support.className = "about-site";
   support.textContent = t("support_email");
   supportLine.append(supportLabel, support);
 
-  const donateH = document.createElement("h3");
+  const donateH = document.createElement("h2");
   donateH.textContent = t("donate_title");
   const donateRow = document.createElement("div");
   donateRow.className = "donate-row";
@@ -441,7 +445,7 @@ function buildAbout() {
   tipeee.textContent = t("donate_tipeee");
   donateRow.append(liberapay, tipeee);
 
-  frag.append(brand, tagline, note, siteLine, supportLine, donateH, donateRow);
+  frag.append(brand, versionLine, tagline, note, siteLine, supportLine, donateH, donateRow);
   el.replaceChildren(frag);
 }
 buildHelp();

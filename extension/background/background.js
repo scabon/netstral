@@ -6,7 +6,9 @@
 // i18n embarqué : via background.scripts (Firefox) ou importScripts (Chrome MV3)
 if (typeof NetstralI18n === "undefined" && typeof importScripts === "function") {
   try {
-    importScripts("i18n.js");
+    // Chemin absolu depuis la racine de l'extension : dans le service worker
+    // MV3, un chemin relatif serait résolu par rapport à background/.
+    importScripts("/i18n.js");
   } catch (err) {
     console.error("i18n load failed:", err);
   }
@@ -463,7 +465,9 @@ async function maybeNotify(state, settings) {
         state.mode === "account" && state.total != null
           ? `${state.spent} ${state.currency} / ${state.total} ${state.currency}`
           : "";
-      await chrome.notifications.create({
+      // Fire-and-forget : une notification qui échoue (ou dont la promesse ne
+      // se résout pas, vu sur Edge MV3) ne doit jamais bloquer la chaîne.
+      chrome.notifications.create({
         type: "basic",
         iconUrl: "icons/icon-128.png",
         title: t("notif_title", { pct: state.pct }),
@@ -472,7 +476,7 @@ async function maybeNotify(state, settings) {
           pct: state.pct,
           amount,
         }),
-      });
+      })?.catch?.(() => {});
     }
     await chrome.storage.local.set({ alertState: { alertedPct: state.pct } });
   } else if (state.pct < settings.alertPct && alerted != null) {
@@ -491,12 +495,12 @@ async function maybeNotifyReset(state, settings) {
   if (last === periodKey) return;
   if (last != null && chrome.notifications?.create) {
     const t = tFor(settings);
-    await chrome.notifications.create({
+    chrome.notifications.create({
       type: "basic",
       iconUrl: "icons/icon-128.png",
       title: t("notif_reset_title"),
       message: t("notif_reset_body"),
-    });
+    })?.catch?.(() => {});
   }
   await chrome.storage.local.set({ resetNotif: { period: periodKey } });
 }
@@ -606,7 +610,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           "accountBudgetError",
         ])
       )
-      .then(sendResponse);
+      .then(sendResponse)
+      // Toujours répondre, même si la chaîne échoue : sinon le port reste
+      // ouvert (return true) et le await du popup ne se résout jamais.
+      .catch((err) => sendResponse({ ok: false, error: String(err) }));
     return true; // réponse asynchrone
   }
 });
