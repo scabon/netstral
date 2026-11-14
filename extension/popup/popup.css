@@ -53,6 +53,7 @@
 
 body {
   width: 300px;
+  max-width: 100%;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 13px;
   color: var(--text);
@@ -628,4 +629,12 @@ button.mini:hover {
 
 .donate-row a:hover {
   opacity: 0.85;
+}
+
+/* Touch (Firefox for Android) : la sheet plein écran est dimensionnée au
+   contenu — passer à 100% pour occuper toute la largeur (comme wagonBAR) */
+@media (pointer: coarse) {
+  body {
+    width: 100%;
+  }
 }
