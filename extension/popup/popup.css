@@ -631,10 +631,24 @@ button.mini:hover {
   opacity: 0.85;
 }
 
-/* Touch (Firefox for Android) : la sheet plein écran est dimensionnée au
-   contenu — passer à 100% pour occuper toute la largeur (comme wagonBAR) */
+/* Touch (Firefox for Android) : la sheet est dimensionnée au contenu —
+   remplir largeur et hauteur, texte plus lisible, cibles tactiles 40px
+   (même approche que wagonBAR) */
 @media (pointer: coarse) {
+  html,
+  body {
+    height: 100%;
+  }
+
   body {
     width: 100%;
+    min-height: 100vh;
+    font-size: 15px;
+  }
+
+  .icon-btn,
+  #btn-menu {
+    min-width: 40px;
+    min-height: 40px;
   }
 }
