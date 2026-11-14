@@ -1,6 +1,6 @@
 // Netstral - données du changelog, affichées dans la vue « Changelog » de la
 // pop-up (extension/changelog.js -> window.NetstralChangelog).
-// Entrées, plus récente en premier : { h: "vX.Y.Z — titre", p: "paragraphe (HTML accepté)" }.
+// Entrées, plus récente en premier : { h: "vX.Y.Z — titre", p: "paragraphe (texte brut, rendu via textContent)" }.
 // La première entrée doit matcher la version du manifest (tools/check-changelog.py).
 window.NetstralChangelog = [
   {

@@ -319,7 +319,7 @@ function buildChangelog() {
     const h = document.createElement("h3");
     h.textContent = entry.h;
     const p = document.createElement("p");
-    p.innerHTML = entry.p; // contenu statique embarqué avec l'extension
+    p.textContent = entry.p; // texte brut embarqué (évite le warning AMO innerHTML)
     frag.append(h, p);
   }
   el.replaceChildren(frag);
