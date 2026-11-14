@@ -6,11 +6,19 @@ const $ = (id) => document.getElementById(id);
 let t = (k) => k; // remplacé au chargement via getPopupState.lang
 let currentLang = "fr"; // langue résolue (choix de l'URL Tipeee)
 
-// Firefox for Android : la sheet de la pop-up est dimensionnée au contenu,
-// donc 100vh ne vaut que la sheet elle-même — forcer la hauteur à celle de
-// l'écran via JS (le CSS @media pointer:coarse gère largeur et font-size).
-if (window.matchMedia && window.matchMedia("(pointer: coarse)").matches && window.screen) {
-  document.body.style.minHeight = window.screen.height + "px";
+// Firefox for Android : la sheet de la pop-up est dimensionnée au contenu
+// (100vh ne vaut que la sheet elle-même) — on force la hauteur au max
+// connu (écran) via JS et on pose une classe html.android pour le CSS
+// (largeur 100%, font 16px, cibles 40px). Détection par userAgent :
+// pointer:coarse n'est pas fiable dans le contexte popup.
+if (/Android/i.test(navigator.userAgent)) {
+  document.documentElement.classList.add("android");
+  const h = Math.max(
+    (window.screen && window.screen.height) || 0,
+    window.outerHeight || 0,
+    2000
+  );
+  document.body.style.minHeight = h + "px";
 }
 
 const versionEl = $("version");

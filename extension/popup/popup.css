@@ -631,24 +631,22 @@ button.mini:hover {
   opacity: 0.85;
 }
 
-/* Touch (Firefox for Android) : la sheet est dimensionnée au contenu —
-   remplir largeur et hauteur, texte plus lisible, cibles tactiles 40px
-   (même approche que wagonBAR) */
-@media (pointer: coarse) {
-  html,
-  body {
-    height: 100%;
-  }
+/* Firefox for Android (classe html.android posée par popup.js) : la sheet
+   est dimensionnée au contenu — remplir largeur/hauteur, texte 16px,
+   cibles tactiles 40px (même approche que wagonBAR) */
+html.android,
+html.android body {
+  height: 100%;
+}
 
-  body {
-    width: 100%;
-    min-height: 100vh;
-    font-size: 16px;
-  }
+html.android body {
+  width: 100%;
+  min-height: 100vh;
+  font-size: 16px;
+}
 
-  .icon-btn,
-  #btn-menu {
-    min-width: 40px;
-    min-height: 40px;
-  }
+html.android .icon-btn,
+html.android #btn-menu {
+  min-width: 40px;
+  min-height: 40px;
 }
