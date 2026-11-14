@@ -6,6 +6,13 @@ const $ = (id) => document.getElementById(id);
 let t = (k) => k; // remplacé au chargement via getPopupState.lang
 let currentLang = "fr"; // langue résolue (choix de l'URL Tipeee)
 
+// Firefox for Android : la sheet de la pop-up est dimensionnée au contenu,
+// donc 100vh ne vaut que la sheet elle-même — forcer la hauteur à celle de
+// l'écran via JS (le CSS @media pointer:coarse gère largeur et font-size).
+if (window.matchMedia && window.matchMedia("(pointer: coarse)").matches && window.screen) {
+  document.body.style.minHeight = window.screen.height + "px";
+}
+
 const versionEl = $("version");
 const consoLabelEl = $("conso-label");
 const consoPctEl = $("conso-pct");
