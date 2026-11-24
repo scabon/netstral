@@ -1,19 +1,26 @@
-// Smoke test des notifications de reset de période (bug Firefox Android,
-// constaté 2x en nov. 2026 : notif « new billing cycle » plusieurs fois par
-// jour alors qu'aucun reset n'a eu lieu).
+// Smoke test des notifications de reset de période (bug constaté en nov. 2026
+// sur Firefox Android ET sur Firefox bureau v1.0.1 : notif « quota reset »
+// alors qu'aucun reset n'a eu lieu).
 //
 // Reproduit en local (vm, pas besoin d'Android) les lectures dégénérées de
-// resetAt vues sur mobile (cache storage / read-modify-write concurrent du
-// service worker) :
-//   A. resetAt = epoch (0 / 1970) constant -> AUCUNE notif, et resetNotif
-//      existant n'est pas écrasé ;
-//   B. resetAt qui oscille valeur valide <-> epoch/null entre deux refresh
-//      -> UNE seule notif (pour la valeur valide), jamais pour epoch/null ;
+// resetAt vues en production (cache storage / SW relancé / upgrade depuis une
+// version antérieure) :
+//   A. resetAt = epoch string ("1970-...") constant -> AUCUNE notif, resetNotif intact ;
+//   B. resetAt qui oscille valeur valide <-> epoch/null -> UNE seule notif ;
 //   C. resetAt absent (null) constant -> aucune notif ;
-//   D. vrai changement de période -> exactement 1 notif.
-// Règle : maybeNotifyReset ne doit retenir comme période que resetAt valide
-// (Date.parse fini et > 0) ; toute lecture invalide est ignorée sans toucher
-// à resetNotif.
+//   D. vrais changements de période (avancées) -> 1 notif par avancée ;
+//   E. resetAt = 0 (nombre, epoch) -> AUCUNE notif (piège Date.parse(0) = an 2000) ;
+//   F. resetAt = "0" (string) -> aucune notif ;
+//   G. upgrade depuis v1.0.0 (période stockée "2026-11", resetAt 2026-12-01)
+//      -> aucune notif, puis 1 notif au vrai reset suivant ;
+//   H. oscillation vers l'arrière (resetAt < période connue) -> aucune notif,
+//      période stockée conservée ;
+//   I. clé stockée dégénérée ("1999-...", écrite par la v1.0.1 via reset_at=0)
+//      -> aucune notif, clé réparée ;
+//   J. resetAt en timestamp unix ms (nombre) -> géré comme une date ISO.
+// Règle : maybeNotifyReset ne notifie que sur AVANCÉE de la période (resetAt
+// strictement supérieur à la fin de la dernière période connue) ; toute
+// lecture invalide est ignorée sans toucher à resetNotif.
 // Usage : node tests/reset-notif-smoke.mjs
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
@@ -139,7 +146,7 @@ check(
 
 // B. oscillation valeur valide <-> epoch/null -> 1 seule notif au total
 resetAt = "2026-12-01T00:00:00Z";
-stored.resetNotif = { period: "2026-11" };
+stored.resetNotif = { period: "2026-11-01T00:00:00.000Z" };
 notifications.length = 0;
 await refresh(); // notif attendue ici (2026-11 -> 2026-12)
 const afterFirst = resetNotifs().length;
@@ -169,18 +176,101 @@ check(
   `notifs=${resetNotifs().length} period=${stored.resetNotif?.period}`
 );
 
-// D. vrai changement de période -> 1 notif
+// D. vrais changements de période (avancées) -> 1 notif par avancée
 resetAt = "2026-12-01T00:00:00Z";
-stored.resetNotif = { period: "2026-11" };
+stored.resetNotif = { period: "2026-11-01T00:00:00.000Z" };
 notifications.length = 0;
 await refresh();
 resetAt = "2027-01-01T00:00:00Z";
 await refresh();
 await refresh();
 check(
-  "D: deux vrais changements de période -> exactement 2 notifs",
+  "D: deux vraies avancées de période -> exactement 2 notifs",
   resetNotifs().length === 2 && stored.resetNotif?.period?.startsWith("2027-01-01"),
   `notifs=${resetNotifs().length} period=${stored.resetNotif?.period}`
+);
+
+// E. resetAt = 0 (nombre, epoch) -> 0 notif (Date.parse(0) vaut ~an 2000,
+//    le check ts > 0 de la v1.0.1 ne le filtrait pas), resetNotif intact
+resetAt = 0;
+stored.resetNotif = { period: "2026-12-01T00:00:00.000Z" };
+notifications.length = 0;
+await refresh();
+await refresh();
+check(
+  "E: resetAt=0 (nombre) -> 0 notif, resetNotif non écrasé",
+  resetNotifs().length === 0 && stored.resetNotif?.period === "2026-12-01T00:00:00.000Z",
+  `notifs=${resetNotifs().length} period=${stored.resetNotif?.period}`
+);
+
+// F. resetAt = "0" (string) -> 0 notif
+resetAt = "0";
+stored.resetNotif = { period: "2026-12-01T00:00:00.000Z" };
+notifications.length = 0;
+await refresh();
+check(
+  'F: resetAt="0" (string) -> 0 notif',
+  resetNotifs().length === 0 && stored.resetNotif?.period === "2026-12-01T00:00:00.000Z",
+  `notifs=${resetNotifs().length} period=${stored.resetNotif?.period}`
+);
+
+// G. upgrade depuis v1.0.0 (clé legacy "2026-11" = mois calendaire) :
+//    resetAt 2026-12-01 n'est PAS une avancée (fin de période 2026-12-01)
+//    -> 0 notif ; le vrai reset suivant (2027-01-01) -> 1 notif
+resetAt = "2026-12-01T00:00:00Z";
+stored.resetNotif = { period: "2026-11" };
+notifications.length = 0;
+await refresh();
+const gFirst = resetNotifs().length;
+resetAt = "2027-01-01T00:00:00Z";
+await refresh();
+check(
+  "G: clé legacy '2026-11' + resetAt 2026-12-01 -> 0 notif, puis 1 notif au reset 2027-01-01",
+  gFirst === 0 && resetNotifs().length === 1 && stored.resetNotif?.period?.startsWith("2027-01-01"),
+  `first=${gFirst} total=${resetNotifs().length} period=${stored.resetNotif?.period}`
+);
+
+// H. oscillation vers l'arrière (resetAt < période connue) -> 0 notif,
+//    période stockée conservée
+resetAt = "2026-11-25T00:00:00Z";
+stored.resetNotif = { period: "2026-12-01T00:00:00.000Z" };
+notifications.length = 0;
+await refresh();
+resetAt = "2026-12-01T00:00:00Z";
+await refresh();
+await refresh();
+check(
+  "H: oscillation arrière (2026-11-25 puis 2026-12-01) -> 0 notif, période conservée",
+  resetNotifs().length === 0 && stored.resetNotif?.period === "2026-12-01T00:00:00.000Z",
+  `notifs=${resetNotifs().length} period=${stored.resetNotif?.period}`
+);
+
+// I. clé stockée dégénérée "1999-12-31T23:00:00.000Z" (écrite par la v1.0.1
+//    via reset_at=0) -> 0 notif, clé réparée avec la période courante
+resetAt = "2026-12-01T00:00:00Z";
+stored.resetNotif = { period: "1999-12-31T23:00:00.000Z" };
+notifications.length = 0;
+await refresh();
+check(
+  "I: clé dégénérée '1999-...' -> 0 notif, réparée en 2026-12-01",
+  resetNotifs().length === 0 && stored.resetNotif?.period === "2026-12-01T00:00:00.000Z",
+  `notifs=${resetNotifs().length} period=${stored.resetNotif?.period}`
+);
+
+// J. resetAt en timestamp unix ms (nombre) -> même sémantique qu'une date ISO
+resetAt = 1796083200000; // 2026-12-01T00:00:00.000Z
+stored.resetNotif = { period: "2026-11-01T00:00:00.000Z" };
+notifications.length = 0;
+await refresh(); // notif attendue (avancée 2026-11-01 -> 2026-12-01)
+const jFirst = resetNotifs().length;
+resetAt = 1796083200000; // même valeur relue -> rien
+await refresh();
+resetAt = 1798761600000; // 2027-01-01T00:00:00.000Z -> notif
+await refresh();
+check(
+  "J: resetAt en ms (nombre) -> 1 notif à l'avancée, rien à la relecture, 1 au reset suivant",
+  jFirst === 1 && resetNotifs().length === 2 && stored.resetNotif?.period === "2027-01-01T00:00:00.000Z",
+  `first=${jFirst} total=${resetNotifs().length} period=${stored.resetNotif?.period}`
 );
 
 const pass = results.every(Boolean);

@@ -415,8 +415,8 @@ def main() -> int:
             and disp.get("changelogDisplay") == "flex"
             and disp.get("mainDisplayChangelog") == "none"
             and disp.get("settingsDisplayChangelog") == "none"
-            and disp.get("changelogEntries") == 2
-            and "v1.0.1" in disp.get("changelogTop", "")
+            and disp.get("changelogEntries") == 3
+            and "v1.0.2" in disp.get("changelogTop", "")
             and disp.get("backFromChangelog") is True
             and disp.get("changelogDisplayBack") == "none"
             and disp.get("menuIcons") == 4

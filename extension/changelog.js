@@ -4,6 +4,10 @@
 // La première entrée doit matcher la version du manifest (tools/check-changelog.py).
 window.NetstralChangelog = [
   {
+    h: "v1.0.2 — Notif « quota réinitialisé » encore plus fiabilisée",
+    p: "La notification de reset ne se déclenche désormais que quand la période de facturation avance réellement : une lecture de resetAt invalide (nombre 0/epoch — Date.parse(0) vaut l'an 2000 et passait le filtre de la v1.0.1, chaîne illisible, date antérieure à 2020), une oscillation entre sources (plan Vibe vs allocation API) ou une clé de période héritée d'une ancienne version ne déclenchent plus jamais la notification, et ne peuvent plus écraser la période connue. Un vrai changement de cycle (ex. 2026-12-01 -> 2027-01-01) notifie toujours une seule fois.",
+  },
+  {
     h: "v1.0.1 — Correctifs (Firefox Android, notifications, description)",
     p: "Pop-up sur Firefox for Android : affichage plein écran réparé (texte 16 px pleine largeur, liens « console / abonnement » visibles en bas de fenêtre — la classe android est désormais aussi détectée via getPlatformInfo, et un min-height JS qui dépassait le viewport de la fenêtre a été supprimé). Notification « quota réinitialisé » intempestive corrigée : une lecture de période invalide (nulle/epoch) n'est plus prise pour un nouveau cycle. Description corrigée : Netstral suit la consommation de ton compte Mistral (badge + pop-up) et ouvre chat.mistral.ai en un clic — il n'y a pas de chat intégré à l'extension.",
   },

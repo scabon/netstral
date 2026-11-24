@@ -453,22 +453,57 @@ async function maybeNotify(state, settings) {
   }
 }
 
-// Notification quand la période de facturation change (resetAt reçu du
-// compte) : une seule fois par période, et jamais au premier démarrage
-// (pas de période précédente connue).
-// resetAt doit être une date valide > epoch : une lecture dégénérée (null,
-// 0, 1970 — vue sur Firefox Android, cache storage / SW relancé) est ignorée
-// SANS écraser resetNotif, sinon chaque oscillation de lecture notifierait
-// à tort (« new billing cycle » plusieurs fois par jour).
+// ---------- Notification de reset de période ----------
+// La notif « quota réinitialisé » ne part que quand la période de facturation
+// AVANCE (resetAt strictement supérieur à la fin de la dernière période
+// connue) : une oscillation de lecture (source api vs vibe, lecture dégradée
+// du storage vue sur Firefox Android) ne doit jamais notifier.
+//
+// parseResetTs n'accepte qu'une date ISO (string) ou un timestamp unix (s/ms)
+// dans une plage crédible. Piège : Date.parse(0) coerce 0 en "0" et vaut
+// ~an 2000 (> 0) — le simple check « ts > 0 » de la v1.0.1 laissait passer un
+// reset_at numérique de 0 (epoch), d'où des notifs fantômes. D'où la borne
+// de salubrité explicite : aucune date avant 2020 n'est un reset crédible.
+const MIN_RESET_TS = Date.parse("2020-01-01T00:00:00Z");
+
+function parseResetTs(raw) {
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    if (raw >= 1e12 && raw < 4e12) return raw; // timestamp ms
+    if (raw >= 1e9 && raw < 4e9) return raw * 1000; // timestamp s
+    return NaN;
+  }
+  if (typeof raw !== "string") return NaN;
+  const ts = Date.parse(raw);
+  return Number.isFinite(ts) && ts >= MIN_RESET_TS ? ts : NaN;
+}
+
+// Fin de la période représentée par une clé stockée : date ISO telle quelle,
+// ou ancien format v1.0.0 « YYYY-MM » (mois calendaire) -> 1er du mois suivant.
+function periodEndTs(period) {
+  if (typeof period !== "string") return NaN;
+  const m = /^(\d{4})-(\d{2})$/.exec(period);
+  if (m) return Date.UTC(Number(m[1]), Number(m[2]), 1);
+  return parseResetTs(period);
+}
+
 async function maybeNotifyReset(state, settings) {
   if (settings.notifyOnReset === false) return;
-  const ts = Date.parse(state.resetAt);
-  if (!Number.isFinite(ts) || ts <= 0) return;
+  const ts = parseResetTs(state.resetAt);
+  // Lecture dégénérée (null, 0, "0", date illisible ou < 2020) : ignorée
+  // SANS écraser resetNotif, sinon chaque oscillation notifierait à tort.
+  if (!Number.isFinite(ts)) return;
   const periodKey = new Date(ts).toISOString();
   const { resetNotif } = await chrome.storage.local.get("resetNotif");
   const last = resetNotif?.period ?? null;
   if (last === periodKey) return;
-  if (last != null && chrome.notifications?.create) {
+  const lastEnd = periodEndTs(last);
+  const lastKnown = Number.isFinite(lastEnd) ? lastEnd : null;
+  // Pas d'avancée de la période (oscillation, valeur qui revient en arrière) :
+  // aucune notif, et on conserve la période la plus récente connue.
+  if (lastKnown != null && ts <= lastKnown) return;
+  // Premier démarrage (last == null) ou clé héritée illisible (ex. v1.0.1
+  // ayant pu écrire une date dégénérée) : on enregistre sans notifier.
+  if (last != null && lastKnown != null && chrome.notifications?.create) {
     const t = tFor(settings);
     chrome.notifications.create({
       type: "basic",
