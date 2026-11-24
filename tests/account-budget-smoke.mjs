@@ -2,7 +2,7 @@
 // 1. admin billing.budget avec vibe_budget -> badge « plan Vibe » (prioritaire) ;
 // 2. console credits (PAYG) en l'absence de session admin -> badge « crédits PAYG » ;
 // 3. admin avec api_budget seulement (pas de vibe_budget) -> badge « allocation API » ;
-// 4. aucune session -> comptage local.
+// 4. aucune session -> badge vide (pas de repli local).
 // Usage : node tests/account-budget-smoke.mjs
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
@@ -16,7 +16,7 @@ const messageListeners = [];
 const badgeCalls = [];
 const titleCalls = [];
 const stored = {
-  settings: { monthlyBudgetTokens: 100, warnPct: 70, dangerPct: 90 },
+  settings: { warnPct: 70, dangerPct: 90 },
 };
 
 let creditsMode = "ok"; // "ok" | "401"
@@ -180,7 +180,7 @@ results.push(
   )
 );
 results.push(
-  await scenario("aucune session -> comptage local", "401", "401", "0%", "")
+  await scenario("aucune session -> badge vide", "401", "401", "", "Netstral")
 );
 
 const pass = results.every(Boolean);

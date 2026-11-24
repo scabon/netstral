@@ -1,6 +1,6 @@
 // Netstral - service worker MV3
 // Service worker : badge de consommation (usage réel du compte Mistral via la
-// session console, fallback comptage local), alertes à seuil, snapshot pop-up.
+// session console), alertes à seuil, snapshot pop-up.
 // Pas de chat interne — le bouton de la pop-up renvoie vers chat.mistral.ai.
 
 // i18n embarqué : via background.scripts (Firefox) ou importScripts (Chrome MV3)
@@ -56,10 +56,10 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
 });
 
-// Rafraîchit le badge quand le budget, les seuils ou le compteur changent
-// (la page options écrit, le badge doit refléter immédiatement).
+// Rafraîchit le badge quand le budget ou les seuils changent
+// (la pop-up écrit les réglages, le badge doit refléter immédiatement).
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === "local" && (changes.settings || changes.usage)) {
+  if (area === "local" && changes.settings) {
     updateBadge();
   }
 });
@@ -72,7 +72,8 @@ chrome.storage.onChanged.addListener((changes, area) => {
 //    ongoing_usage_balance. C'est la source prioritaire du badge.
 // 2. admin.mistral.ai/api/local-trpc/billing.budget — le budget de
 //    l'abonnement (allocation API incluse dans Vibe Pro), en second.
-// Sans session (401/302/login) on retombe sur le comptage local.
+// Sans session (401/302/login) aucune donnée n'est disponible : pas de
+// repli (le chat se fait sur chat.mistral.ai, hors extension).
 
 const CREDITS_URL = "https://console.mistral.ai/api/billing/credits";
 const BUDGET_URL =
@@ -336,7 +337,6 @@ function ensureBudgetAlarm() {
 // ---------- Badge ----------
 
 const DEFAULT_SETTINGS = {
-  monthlyBudgetTokens: null, // null = pas de badge
   warnPct: 70,
   dangerPct: 90,
   lang: "system", // system | fr | en
@@ -345,10 +345,6 @@ const DEFAULT_SETTINGS = {
   alertPct: 90,
   notifyOnReset: true,
 };
-
-function monthKey(date = new Date()) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-}
 
 async function getSettings() {
   const { settings } = await chrome.storage.local.get("settings");
@@ -368,64 +364,37 @@ function badgeColor(pct, settings) {
 // Priorité des sources :
 // 1. plan Vibe (admin billing.budget.vibe_budget — la page /subscription) ;
 // 2. allocation API incluse dans l'abonnement (api_budget) ;
-// 3. crédits PAYG de la console (wallet non nul) ;
-// 4. comptage local « tokens passés par Netstral » vs budget de tokens.
-// mode "account" = source 1-3, mode "local" = source 4, mode "none" = rien.
+// 3. crédits PAYG de la console (wallet non nul).
+// mode "account" = une source 1-3 fraîche, mode "none" = aucune (pas de
+// session) : pas de repli, le badge est alors vide.
 async function computeBadgeState() {
   const settings = await getSettings();
-  const { consoleCredits, accountBudget, usage: all = {} } =
-    await chrome.storage.local.get([
-      "consoleCredits",
-      "accountBudget",
-      "usage",
-    ]);
+  const { consoleCredits, accountBudget } = await chrome.storage.local.get([
+    "consoleCredits",
+    "accountBudget",
+  ]);
 
   const record = pickBudgetRecord(consoleCredits, accountBudget);
-  if (record) {
-    const pct = Math.min(100, Math.round(record.usage_percentage));
-    const spent =
-      record.total != null
-        ? round2((record.usage_percentage / 100) * record.total)
-        : null;
-    return {
-      mode: "account",
-      source: record.source ?? null,
-      label: record.label,
-      labelKey: record.labelKey ?? "badge_local",
-      pct,
-      color: badgeColor(pct, settings),
-      spent,
-      total: record.total != null ? round2(record.total) : null,
-      currency: record.currency ?? "EUR",
-      resetAt: record.reset_at ?? null,
-      fetchedAt: record.fetchedAt ?? null,
-    };
+  if (!record) {
+    return { mode: "none", pct: null, color: null };
   }
-
-  const spentTokens = all?.[monthKey()]?.total_tokens ?? 0;
-  if (!settings.monthlyBudgetTokens) {
-    return {
-      mode: "none",
-      label: "comptage local",
-      labelKey: "badge_local",
-      pct: null,
-      color: null,
-      spentTokens,
-      budgetTokens: null,
-    };
-  }
-  const pct = Math.min(
-    100,
-    Math.floor((spentTokens / settings.monthlyBudgetTokens) * 100)
-  );
+  const pct = Math.min(100, Math.round(record.usage_percentage));
+  const spent =
+    record.total != null
+      ? round2((record.usage_percentage / 100) * record.total)
+      : null;
   return {
-    mode: "local",
-    label: "comptage local",
-    labelKey: "badge_local",
+    mode: "account",
+    source: record.source ?? null,
+    label: record.label,
+    labelKey: record.labelKey,
     pct,
     color: badgeColor(pct, settings),
-    spentTokens,
-    budgetTokens: settings.monthlyBudgetTokens,
+    spent,
+    total: record.total != null ? round2(record.total) : null,
+    currency: record.currency ?? "EUR",
+    resetAt: record.reset_at ?? null,
+    fetchedAt: record.fetchedAt ?? null,
   };
 }
 
@@ -484,12 +453,18 @@ async function maybeNotify(state, settings) {
   }
 }
 
-// Notification quand la période de facturation change (resetAt reçu ou
-// nouveau mois calendaire en repli local) : une seule fois par période,
-// et jamais au premier démarrage (pas de période précédente connue).
+// Notification quand la période de facturation change (resetAt reçu du
+// compte) : une seule fois par période, et jamais au premier démarrage
+// (pas de période précédente connue).
+// resetAt doit être une date valide > epoch : une lecture dégénérée (null,
+// 0, 1970 — vue sur Firefox Android, cache storage / SW relancé) est ignorée
+// SANS écraser resetNotif, sinon chaque oscillation de lecture notifierait
+// à tort (« new billing cycle » plusieurs fois par jour).
 async function maybeNotifyReset(state, settings) {
   if (settings.notifyOnReset === false) return;
-  const periodKey = state.resetAt ?? monthKey();
+  const ts = Date.parse(state.resetAt);
+  if (!Number.isFinite(ts) || ts <= 0) return;
+  const periodKey = new Date(ts).toISOString();
   const { resetNotif } = await chrome.storage.local.get("resetNotif");
   const last = resetNotif?.period ?? null;
   if (last === periodKey) return;
@@ -547,7 +522,7 @@ function pickBudgetRecord(consoleCredits, accountBudget) {
 // ---------- Pop-up ----------
 
 // Snapshot complet pour la pop-up : état du badge (même calcul que
-// l'icône), infos compte, plan, erreurs de session, usage local du mois.
+// l'icône), infos compte, plan, erreurs de session.
 async function getPopupState() {
   const settings = await getSettings();
   const st = await chrome.storage.local.get([
@@ -557,14 +532,8 @@ async function getPopupState() {
     "accountBudgetError",
     "subscriptionPlan",
     "subscriptionPlanError",
-    "usage",
   ]);
   const badge = await computeBadgeState();
-  const localUsage = st.usage?.[monthKey()] ?? {
-    prompt_tokens: 0,
-    completion_tokens: 0,
-    total_tokens: 0,
-  };
   return {
     ok: true,
     version: chrome.runtime.getManifest().version,
@@ -573,7 +542,6 @@ async function getPopupState() {
     settings: {
       warnPct: settings.warnPct,
       dangerPct: settings.dangerPct,
-      monthlyBudgetTokens: settings.monthlyBudgetTokens,
       lang: settings.lang ?? "system",
       theme: settings.theme ?? "system",
       alertsEnabled: settings.alertsEnabled !== false,
@@ -588,7 +556,6 @@ async function getPopupState() {
       subscriptionPlan: st.subscriptionPlan ?? null,
       subscriptionPlanError: st.subscriptionPlanError ?? null,
     },
-    localUsage,
   };
 }
 

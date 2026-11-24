@@ -91,8 +91,8 @@ check("refs locales de popup.html existent", missingRefs.length === 0,
 const consoleErrors = [];
 const messageListeners = [];
 const stored = {
-  settings: { monthlyBudgetTokens: null, lang: "fr", alertsEnabled: true, alertPct: 90, notifyOnReset: true },
-  resetNotif: { period: "2026-10" }, // période passée -> notif reset déclenchée
+  settings: { lang: "fr", alertsEnabled: true, alertPct: 90, notifyOnReset: true },
+  resetNotif: { period: "2026-10" }, // période passée -> notif reset déclenchée si resetAt connu
 };
 const chromeMock = {
   storage: {

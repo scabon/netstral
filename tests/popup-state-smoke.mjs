@@ -2,7 +2,7 @@
 // 1. session admin OK (vibe_budget) + plan "Pro" -> getPopupState renvoie
 //    badge account/plan Vibe + subscriptionPlan.plan "pro" ;
 // 2. subscription "enterprise" (billing.subscription) -> plan "enterprise" ;
-// 3. aucune session -> badge en comptage local, plan inconnu.
+// 3. aucune session -> badge mode "none" (pas de repli local), plan inconnu.
 // Usage : node tests/popup-state-smoke.mjs
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
@@ -14,8 +14,7 @@ const code = readFileSync(
 
 const messageListeners = [];
 const stored = {
-  settings: { monthlyBudgetTokens: 100000, warnPct: 70, dangerPct: 90 },
-  usage: { "2026-11": { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 } },
+  settings: { warnPct: 70, dangerPct: 90 },
 };
 
 let mode = "pro"; // "pro" | "enterprise" | "none"
@@ -166,7 +165,7 @@ results.push(
     if (st.badge?.total !== 255) p.push(`total=${st.badge?.total}`);
     if (st.account?.subscriptionPlan?.plan !== "pro") p.push(`plan=${st.account?.subscriptionPlan?.plan}`);
     if (st.version !== "0.3.0") p.push(`version=${st.version}`);
-    if (st.localUsage?.total_tokens !== 15) p.push("localUsage faux");
+    if ("localUsage" in st) p.push("localUsage ne devrait plus exister");
     return p;
   })
 );
@@ -188,11 +187,10 @@ results.push(
   })
 );
 results.push(
-  await scenario("sans session -> comptage local", "none", (st) => {
+  await scenario("sans session -> badge vide (mode none)", "none", (st) => {
     const p = [];
-    if (st.badge?.mode !== "local") p.push(`mode=${st.badge?.mode}`);
-    if (st.badge?.pct !== 0) p.push(`pct=${st.badge?.pct}`);
-    if (st.badge?.spentTokens !== 15) p.push(`spent=${st.badge?.spentTokens}`);
+    if (st.badge?.mode !== "none") p.push(`mode=${st.badge?.mode}`);
+    if (st.badge?.pct !== null) p.push(`pct=${st.badge?.pct}`);
     if (st.account?.subscriptionPlan?.plan != null) p.push("plan renseigné sans session");
     if (!st.account?.accountBudgetError) p.push("pas d'erreur de session remontée");
     return p;

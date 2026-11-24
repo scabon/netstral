@@ -9,8 +9,9 @@ navigables -> la pop-up est testée sur copie localhost avec chrome mock.
 Phases :
   A. build xpi + install temporaire -> le manifest MV3 (background.scripts)
      charge, uuid résoluble.
-  B. storage.js seedé (settings + usage) -> badge « 15% » (comptage local) ;
-     manifest embarqué : default_popup déclaré, AUCUN side_panel/sidebar_action.
+  B. storage.js seedé (settings, aucune session) -> badge vide (le comptage
+     local a été retiré) ; manifest embarqué : default_popup déclaré, AUCUN
+     side_panel/sidebar_action.
   C2. copie localhost de la pop-up : réglages (thème dark, langue EN avec
       drapeaux, alertes, clé API pré-remplie).
   C3. copie localhost de la pop-up (chrome mock) : rendu conso/projection/menu.
@@ -85,11 +86,8 @@ def make_profile(dest: Path) -> Path:
 
 
 def seed_storage(profile: Path) -> None:
-    now = time.localtime()
-    month = f"{now.tm_year}-{now.tm_mon:02d}"
     seeds = {
-        "settings": {"monthlyBudgetTokens": 1000, "warnPct": 70, "dangerPct": 90},
-        "usage": {month: {"prompt_tokens": 120, "completion_tokens": 30, "total_tokens": 150}},
+        "settings": {"warnPct": 70, "dangerPct": 90},
         "accountBudget": None,
     }
     data_dir = profile / "browser-extension-data" / ADDON_ID
@@ -125,7 +123,7 @@ POPUP_MOCK = """
         pct: 21, color: "#1a7f37", spent: 53.55, total: 255, currency: "EUR",
         resetAt: "2026-12-01T00:00:00Z", fetchedAt: Date.now() - 5 * 60000,
       },
-      settings: { warnPct: 70, dangerPct: 90, monthlyBudgetTokens: null, lang: "system", theme: "system", alertsEnabled: true, alertPct: 90, notifyOnReset: true },
+      settings: { warnPct: 70, dangerPct: 90, lang: "system", theme: "system", alertsEnabled: true, alertPct: 90, notifyOnReset: true },
       account: {
         consoleCredits: { fetchedAt: Date.now(), total: 100, spent: 40, currency: "EUR" },
         consoleCreditsError: null,
@@ -134,23 +132,18 @@ POPUP_MOCK = """
         subscriptionPlan: { fetchedAt: Date.now(), plan: "pro", planRaw: "Pro", planPath: "subscription.plan.name" },
         subscriptionPlanError: null,
       },
-      localUsage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
     };
     function refreshLang() {
       const s = store.settings || {};
       state.settings = {
-        warnPct: 70, dangerPct: 90, monthlyBudgetTokens: null,
+        warnPct: 70, dangerPct: 90,
         lang: s.lang ?? "system", theme: s.theme ?? "system",
         alertsEnabled: s.alertsEnabled !== false, alertPct: s.alertPct ?? 90, notifyOnReset: s.notifyOnReset !== false,
       };
       state.lang = NetstralI18n.resolveLang(s.lang, "fr-FR");
     }
     refreshLang();
-    // #local : badge en comptage local ; #over : projection > 100 % ;
-    // #nokey : plan non reconnu.
-    if (location.hash === "#local") {
-      state.badge = { mode: "local", label: "comptage local", labelKey: "badge_local", pct: 15, color: "#1a7f37", spentTokens: 150, budgetTokens: 1000 };
-    }
+    // #over : projection > 100 % ; #nokey : plan non reconnu.
     if (location.hash === "#over") {
       state.badge = {
         mode: "account", source: "admin-budget", label: "plan Vibe", labelKey: "badge_plan_vibe",
@@ -285,13 +278,13 @@ def main() -> int:
             badge = chrome_script(
                 """
                 const b = win.document.getElementById('netstral_cabon14_com-BAP');
-                return b ? b.getAttribute('badge') : null;
+                return b ? (b.getAttribute('badge') || '') : null;
                 """
             )
-            if badge:
+            if badge is not None:
                 break
             time.sleep(0.5)
-        check("B: badge = 15% (comptage local seed)", badge == "15%", repr(badge))
+        check("B: badge vide sans session (comptage local retiré)", badge == "", repr(badge))
 
         # Le manifest embarqué (xpi buildé depuis extension/) doit déclarer
         # la pop-up sur l'action.
@@ -381,7 +374,7 @@ def main() -> int:
               r.aboutDisplay = getComputedStyle(document.getElementById('view-about')).display;
               r.mainDisplayAbout = getComputedStyle(document.getElementById('view-main')).display;
               r.aboutSections = document.querySelectorAll('#aboutContent h3').length;
-              r.aboutBrand = (document.querySelector('#aboutContent .brand-line') || {}).textContent || '';
+              r.aboutBrand = (document.querySelector('#aboutContent .about-version') || {}).textContent || '';
               r.aboutSite = !!document.querySelector('#aboutContent a[href*="cabon14.com"]');
               r.aboutSupport = !!document.querySelector('#aboutContent a[href^="mailto:support@cabon14.com"]');
               r.aboutLiberapay = !!document.querySelector('#aboutContent a.donate-liberapay[href*="liberapay.com/cabon14"]');
@@ -422,8 +415,8 @@ def main() -> int:
             and disp.get("changelogDisplay") == "flex"
             and disp.get("mainDisplayChangelog") == "none"
             and disp.get("settingsDisplayChangelog") == "none"
-            and disp.get("changelogEntries") == 0
-            and disp.get("changelogTop") == ""
+            and disp.get("changelogEntries") == 2
+            and "v1.0.1" in disp.get("changelogTop", "")
             and disp.get("backFromChangelog") is True
             and disp.get("changelogDisplayBack") == "none"
             and disp.get("menuIcons") == 4
@@ -437,8 +430,8 @@ def main() -> int:
             and disp.get("aboutShown") is True
             and disp.get("aboutDisplay") == "flex"
             and disp.get("mainDisplayAbout") == "none"
-            and disp.get("aboutSections") == 1
-            and "v" in disp.get("aboutBrand", "")
+            and disp.get("aboutSections") == 0
+            and "0.5.0" in disp.get("aboutBrand", "")
             and disp.get("aboutSite") is True
             and disp.get("aboutSupport") is True
             and disp.get("aboutLiberapay") is True
@@ -478,7 +471,7 @@ def main() -> int:
               reset: document.getElementById('acc-reset').textContent,
               resetIn: document.getElementById('acc-reset-in').textContent,
               errHidden: document.getElementById('acc-error').classList.contains('hidden'),
-              localHidden: document.querySelector('section.local').classList.contains('hidden'),
+              localAbsent: !document.querySelector('section.local'),
               projHidden: document.getElementById('projection').classList.contains('hidden'),
               projRate: document.getElementById('proj-rate').textContent,
               proj100: document.getElementById('proj-100').textContent,
@@ -500,7 +493,7 @@ def main() -> int:
         end_pct = round(rate * period)
         d100 = round((100 - 21) / rate)
         check(
-            "C3: pop-up rend conso (21%) + plan Pro + reset dans Xj + projection ; local masqué",
+            "C3: pop-up rend conso (21%) + plan Pro + reset dans Xj + projection ; section local absente",
             pop
             and pop["version"] == "v0.5.0-test"
             and pop["pct"].replace(" ", "").replace("\u202f", "").replace("\u00a0", "") == "21%"
@@ -511,7 +504,7 @@ def main() -> int:
             and pop["reset"] == "2026-12-01"  # yyyy-MM-dd
             and "dans" in pop["resetIn"] and "jour" in pop["resetIn"]
             and pop["errHidden"] is True   # source compte OK -> pas d'erreur de session
-            and pop["localHidden"] is True  # comptage local masqué avec source compte
+            and pop["localAbsent"] is True  # section « comptage local » supprimée du HTML
             and pop["projHidden"] is False
             and "%/jour" in pop["projRate"]
             and f"dans {days_left} j" in pop["projRate"]
@@ -524,46 +517,8 @@ def main() -> int:
             + f" | attendu: mark ~{end_pct}%, dans {days_left}j, 100% dans ~{d100}j",
         )
 
-        # C3b : repli comptage local (#local) -> section local visible.
-        # (détour par une autre page : même URL + hash ne rechargerait pas)
-        client.navigate(f"http://127.0.0.1:{HTTP_PORT}/i18n.js")
-        time.sleep(0.4)
-        client.navigate(f"http://127.0.0.1:{HTTP_PORT}/popup/popup.html#local")
-        time.sleep(0.8)
-        pop_local = client.execute_script(
-            """
-            return {
-              pct: document.getElementById('conso-pct').textContent,
-              detail: document.getElementById('conso-detail').textContent,
-              localHidden: document.querySelector('section.local').classList.contains('hidden'),
-              tokens: document.getElementById('local-tokens').textContent,
-              projHidden: document.getElementById('projection').classList.contains('hidden'),
-              markLabel: document.getElementById('proj-mark-label').textContent,
-              fillWidth: document.getElementById('proj-fill').style.width,
-              hintVisible: !document.getElementById('acc-error').classList.contains('hidden'),
-              hintClass: document.getElementById('acc-error').className,
-              hintLink: (document.querySelector('#acc-error a') || {}).href || '',
-            };
-            """
-        )
-        norm = lambda s: (s or "").replace(" ", "").replace("\u202f", "").replace("\u00a0", "")
-        check(
-            "C3b: repli local -> 15%, 150/1000 tokens, section local visible, projection graphique, bandeau connexion",
-            pop_local
-            and norm(pop_local["pct"]) == "15%"
-            and "150" in pop_local["detail"] and "1000" in norm(pop_local["detail"])
-            and pop_local["localHidden"] is False
-            and norm(pop_local["tokens"]) == "15"
-            and pop_local["projHidden"] is False
-            and pop_local["markLabel"].startswith("~") and pop_local["markLabel"].endswith(" %")
-            and pop_local["fillWidth"] == "15%"
-            and pop_local["hintVisible"] is True
-            and pop_local["hintClass"] == "hint"
-            and "console.mistral.ai" in pop_local["hintLink"],
-            json.dumps(pop_local, ensure_ascii=False)[:200],
-        )
-
         # C3d : #over -> projection > 100 % : zone hachurée, marqueur rouge
+        norm = lambda s: (s or "").replace(" ", "").replace("\u202f", "").replace("\u00a0", "")
         client.navigate(f"http://127.0.0.1:{HTTP_PORT}/i18n.js")
         time.sleep(0.4)
         client.navigate(f"http://127.0.0.1:{HTTP_PORT}/popup/popup.html#over")
@@ -709,6 +664,50 @@ def main() -> int:
             and "console.mistral.ai" in menu["linkConsole"]
             and "admin.mistral.ai/subscription" in menu["linkSub"],
             json.dumps(menu, ensure_ascii=False)[:260],
+        )
+
+        # ---- Phase C4 : classe html.android (Firefox for Android) -> pop-up plein écran
+        # Sur desktop de test la classe ne doit PAS être posée (UA + getPlatformInfo) ;
+        # posée à la main, elle doit étirer le contenu (flex colonne, 16px, 100% hauteur).
+        android = client.execute_script(
+            """
+            const cls = () => document.documentElement.classList.contains('android');
+            const before = cls();
+            const bodyBefore = getComputedStyle(document.body).display;
+            // revenir à la vue principale (le test C3 a laissé la vue « À propos »)
+            document.getElementById('view-main').classList.remove('hidden');
+            for (const v of ['settings','help','changelog','about']) document.getElementById('view-' + v).classList.add('hidden');
+            document.documentElement.classList.add('android');
+            const cs = getComputedStyle(document.body);
+            const main = document.querySelector('main');
+            const links = document.querySelector('.links');
+            const r = {
+              before,
+              bodyBefore,
+              after: cls(),
+              bodyDisplay: cs.display,
+              bodyDir: cs.flexDirection,
+              fontSize: cs.fontSize,
+              mainGrow: main ? getComputedStyle(main).flexGrow : '',
+              linksBottom: links ? Math.round(links.getBoundingClientRect().bottom) : 0,
+              innerH: window.innerHeight,
+            };
+            document.documentElement.classList.remove('android');
+            return r;
+            """
+        )
+        check(
+            "C4: desktop -> pas de classe android ; classe posée -> body flex colonne 16px, main flex:1, liens collés en bas",
+            android
+            and android["before"] is False
+            and android["bodyBefore"] != "flex"
+            and android["after"] is True
+            and android["bodyDisplay"] == "flex"
+            and android["bodyDir"] == "column"
+            and android["fontSize"] == "16px"
+            and android["mainGrow"] == "1"
+            and android["linksBottom"] >= android["innerH"] - 80,
+            json.dumps(android, ensure_ascii=False)[:600],
         )
 
         return 0 if all(ok for _, ok in checks) else 1

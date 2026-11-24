@@ -631,18 +631,40 @@ button.mini:hover {
   opacity: 0.85;
 }
 
-/* Firefox for Android (classe html.android posée par popup.js) : la sheet
-   est dimensionnée au contenu — remplir largeur/hauteur, texte 16px,
-   cibles tactiles 40px (même approche que wagonBAR) */
-html.android,
-html.android body {
+/* Firefox for Android (classe html.android posée par popup.js) : la pop-up
+   s'ouvre en fenêtre plein écran — remplir largeur/hauteur, étirer le
+   contenu en colonne flex (footer collé en bas), texte 16px, cibles 40px */
+html.android {
   height: 100%;
 }
 
 html.android body {
   width: 100%;
+  height: 100%;
   min-height: 100vh;
   font-size: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+html.android main {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+html.android #view-main {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+html.android .links {
+  margin-top: auto;
+  padding-bottom: env(safe-area-inset-bottom, 12px);
 }
 
 html.android .icon-btn,

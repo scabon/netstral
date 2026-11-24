@@ -6,20 +6,23 @@ const $ = (id) => document.getElementById(id);
 let t = (k) => k; // remplacé au chargement via getPopupState.lang
 let currentLang = "fr"; // langue résolue (choix de l'URL Tipeee)
 
-// Firefox for Android : la sheet de la pop-up est dimensionnée au contenu
-// (100vh ne vaut que la sheet elle-même) — on force la hauteur au max
-// connu (écran) via JS et on pose une classe html.android pour le CSS
-// (largeur 100%, font 16px, cibles 40px). Détection par userAgent :
-// pointer:coarse n'est pas fiable dans le contexte popup.
-if (/Android/i.test(navigator.userAgent)) {
+// Firefox for Android : la pop-up s'ouvre en fenêtre plein écran, mais le
+// contenu reste en haut en 13px si on ne force rien. On pose une classe
+// html.android pour le CSS (largeur/hauteur 100%, contenu étiré en flex,
+// font 16px, cibles 40px, min-height: 100vh sur le body). PAS de min-height
+// JS : forcer body à screen.height (> viewport Fenix) poussait le footer
+// .links sous le pli et laissait une grande zone blanche.
+// Détection robuste : UA "Android" OU chrome.runtime.getPlatformInfo().os
+// === "android" (l'UA de la pop-up peut être réduit sur Fenix Android).
+function applyAndroidFullscreen() {
   document.documentElement.classList.add("android");
-  const h = Math.max(
-    (window.screen && window.screen.height) || 0,
-    window.outerHeight || 0,
-    2000
-  );
-  document.body.style.minHeight = h + "px";
 }
+if (/Android/i.test(navigator.userAgent)) applyAndroidFullscreen();
+try {
+  chrome.runtime.getPlatformInfo?.((info) => {
+    if (info?.os === "android") applyAndroidFullscreen();
+  });
+} catch { /* hors extension (page de test) */ }
 
 const versionEl = $("version");
 const consoLabelEl = $("conso-label");
@@ -33,7 +36,6 @@ const accWalletEl = $("acc-wallet");
 const accResetEl = $("acc-reset");
 const accResetInEl = $("acc-reset-in");
 const accErrorEl = $("acc-error");
-const localTokensEl = $("local-tokens");
 const projEl = $("projection");
 const projOver100El = $("proj-over100");
 const projFillEl = $("proj-fill");
@@ -60,7 +62,6 @@ const btnAbout = $("btn-about");
 
 const fmtEUR = (n, cur = "EUR") =>
   `${n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${cur}`;
-const fmtTokens = (n) => n.toLocaleString("fr-FR");
 // Format compact yyyy-MM-dd, composantes UTC (les reset Mistral sont à 00:00:00Z).
 const fmtDate = (iso) => {
   const d = new Date(iso);
@@ -149,28 +150,18 @@ function render(state) {
   // --- Barre de progression (même % et couleur que le badge) ---
   const b = state.badge;
   if (b && b.pct != null) {
-    consoLabelEl.textContent = `${t("conso_title")} — ${t(b.labelKey ?? "badge_local")}`;
+    consoLabelEl.textContent = `${t("conso_title")} — ${t(b.labelKey)}`;
     consoPctEl.textContent = `${b.pct} %`;
     consoPctEl.style.color = b.color;
     barFillEl.style.width = `${b.pct}%`;
     barFillEl.style.background = b.color;
-    if (b.mode === "account") {
-      consoDetailEl.textContent =
-        b.total != null
-          ? t("amount_of", { a: fmtEUR(b.spent, b.currency), b: fmtEUR(b.total, b.currency) })
-          : `${b.pct} %`;
-    } else {
-      consoDetailEl.textContent = t("tokens_of", {
-        a: fmtTokens(b.spentTokens),
-        b: fmtTokens(b.budgetTokens),
-      });
-    }
-    consoSourceEl.textContent =
-      b.mode === "account" && b.fetchedAt
-        ? t("read_ago", { ago: ilYA(b.fetchedAt) })
-        : b.mode === "local"
-          ? t("conso_local_fallback")
-          : "";
+    consoDetailEl.textContent =
+      b.total != null
+        ? t("amount_of", { a: fmtEUR(b.spent, b.currency), b: fmtEUR(b.total, b.currency) })
+        : `${b.pct} %`;
+    consoSourceEl.textContent = b.fetchedAt
+      ? t("read_ago", { ago: ilYA(b.fetchedAt) })
+      : "";
   } else {
     consoLabelEl.textContent = t("conso_title");
     consoPctEl.textContent = "—";
@@ -183,10 +174,6 @@ function render(state) {
   renderProjection(b);
 
   // --- Compte ---
-  // Le comptage local n'a d'intérêt que sans source compte : masqué dès
-  // que la conso du compte Mistral est disponible (même % que le badge).
-  document.querySelector("section.local").classList.toggle("hidden", b?.mode === "account");
-
   const acc = state.account ?? {};
   // Type de plan : affiché seulement si une valeur a été reconnue — tant que
   // le mapping de billing.subscriptions.* n'est pas confirmé, on masque.
@@ -253,10 +240,6 @@ function render(state) {
   } else {
     accErrorEl.className = "error hidden";
   }
-
-  // --- Usage local ---
-  const u = state.localUsage;
-  localTokensEl.textContent = u ? fmtTokens(u.total_tokens) : "—";
 
   // --- Réglages (pré-remplis depuis le state) ---
   const s = state.settings ?? {};
@@ -398,6 +381,11 @@ const DONATION_LIBERAPAY = "https://liberapay.com/cabon14/";
 const DONATION_TIPEEE_FR = "https://fr.tipeee.com/cabon14/";
 const DONATION_TIPEEE_EN = "https://en.tipeee.com/cabon14/";
 
+// Fiches store publiées (tools/stores.json pour les IDs)
+const STORE_AMO = "https://addons.mozilla.org/en-US/firefox/addon/netstral/";
+const STORE_EDGE =
+  "https://microsoftedge.microsoft.com/addons/detail/netstral/iahobbehkdeofjiopmcamnlanponpjce";
+
 function buildAbout() {
   const el = $("aboutContent");
   const frag = document.createDocumentFragment();
@@ -433,6 +421,25 @@ function buildAbout() {
   site.textContent = t("about_site");
   siteLine.append(madeBy, site);
 
+  const storesLine = document.createElement("p");
+  const storesLabel = document.createElement("span");
+  storesLabel.textContent = `${t("about_stores_label")} `;
+  const storeFf = document.createElement("a");
+  storeFf.href = STORE_AMO;
+  storeFf.target = "_blank";
+  storeFf.rel = "noreferrer";
+  storeFf.className = "about-site";
+  storeFf.textContent = t("store_firefox");
+  const storeEdge = document.createElement("a");
+  storeEdge.href = STORE_EDGE;
+  storeEdge.target = "_blank";
+  storeEdge.rel = "noreferrer";
+  storeEdge.className = "about-site";
+  storeEdge.textContent = t("store_edge");
+  const sep = document.createElement("span");
+  sep.textContent = " · ";
+  storesLine.append(storesLabel, storeFf, sep, storeEdge);
+
   const supportLine = document.createElement("p");
   const supportLabel = document.createElement("span");
   supportLabel.textContent = `${t("support_label")} `;
@@ -460,7 +467,7 @@ function buildAbout() {
   tipeee.textContent = t("donate_tipeee");
   donateRow.append(liberapay, tipeee);
 
-  frag.append(brand, versionLine, tagline, note, siteLine, supportLine, donateH, donateRow);
+  frag.append(brand, versionLine, tagline, note, siteLine, storesLine, supportLine, donateH, donateRow);
   el.replaceChildren(frag);
 }
 buildHelp();
@@ -499,8 +506,7 @@ btnAbout.addEventListener("click", () => showView("about"));
 chrome.storage.onChanged.addListener((changes, area) => {
   if (
     area === "local" &&
-    (changes.usage ||
-      changes.consoleCredits ||
+    (changes.consoleCredits ||
       changes.accountBudget ||
       changes.subscriptionPlan ||
       changes.settings)
