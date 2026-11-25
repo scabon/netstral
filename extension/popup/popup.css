@@ -592,7 +592,10 @@ button.mini:hover {
   color: var(--muted2);
 }
 
-.about-site {
+.about-site,
+.about-source,
+.about-site:visited,
+.about-source:visited {
   font-size: 13px;
   color: var(--accent);
   text-decoration: none;

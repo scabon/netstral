@@ -5,7 +5,7 @@
 window.NetstralChangelog = [
   {
     h: "v1.0.3 — Lien Source vers le dépôt GitHub",
-    p: "La vue À propos affiche désormais un lien « Source : github.com/scabon/netstral » vers le code source de l'extension, désormais public.",
+    p: "La vue À propos affiche désormais un lien « Source : github.com/scabon/netstral » vers le code source de l'extension, désormais public — couleur de lien lisible (accent, état visité inclus).",
   },
   {
     h: "v1.0.2 — Notif « quota réinitialisé » encore plus fiabilisée",
