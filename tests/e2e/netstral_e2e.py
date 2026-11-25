@@ -27,7 +27,21 @@ import socket
 import subprocess
 import sys
 import tempfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+
+
+def _month_before(dt):
+    y, m = (dt.year - 1, 12) if dt.month == 1 else (dt.year, dt.month - 1)
+    return dt.replace(year=y, month=m)
+
+
+# resetAt relatif à aujourd'hui (même calcul que popup.js : un mois calendaire
+# avant le reset) — une date codée en dur deviendrait passée et casserait C3.
+RESET_AT = (datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+            + timedelta(days=6))
+RESET_ISO = RESET_AT.strftime("%Y-%m-%dT00:00:00Z")
+RESET_D = RESET_AT.strftime("%Y-%m-%d")
+PREV_AT = _month_before(RESET_AT)
 import threading
 import time
 import zipfile
@@ -213,7 +227,7 @@ def build_srv(srv_dir: Path) -> None:
     (srv_dir / "popup" / "popup.html").write_text(
         pp.replace(
             '<script type="module" src="popup.js"></script>',
-            POPUP_MOCK + '<script type="module" src="popup.js"></script>',
+            POPUP_MOCK.replace("2026-12-01T00:00:00Z", RESET_ISO) + '<script type="module" src="popup.js"></script>',
         ),
         encoding="utf-8",
     )
@@ -483,9 +497,9 @@ def main() -> int:
             };
             """
         )
-        # projection attendue (même calcul que popup.js : pct=21, reset 2026-12-01Z)
-        reset_ms = datetime(2026, 12, 1, tzinfo=timezone.utc).timestamp() * 1000
-        prev_ms = datetime(2026, 11, 1, tzinfo=timezone.utc).timestamp() * 1000
+        # projection attendue (même calcul que popup.js : pct=21, reset relatif)
+        reset_ms = RESET_AT.timestamp() * 1000
+        prev_ms = PREV_AT.timestamp() * 1000
         period = round((reset_ms - prev_ms) / 86400000)
         days_left = max(0, math.ceil((reset_ms - time.time() * 1000) / 86400000))
         elapsed = max(1, period - days_left)
@@ -501,7 +515,7 @@ def main() -> int:
             and "26" in pop["bg"]  # rgb(26, 127, 55) = #1a7f37
             and "255" in pop["detail"]
             and pop["plan"] == "Pro" and pop["planRowHidden"] is False
-            and pop["reset"] == "2026-12-01"  # yyyy-MM-dd
+            and pop["reset"] == RESET_D  # yyyy-MM-dd
             and "dans" in pop["resetIn"] and "jour" in pop["resetIn"]
             and pop["errHidden"] is True   # source compte OK -> pas d'erreur de session
             and pop["localAbsent"] is True  # section « comptage local » supprimée du HTML
