@@ -391,6 +391,7 @@ def main() -> int:
               r.aboutBrand = (document.querySelector('#aboutContent .about-version') || {}).textContent || '';
               r.aboutSite = !!document.querySelector('#aboutContent a[href*="cabon14.com"]');
               r.aboutSupport = !!document.querySelector('#aboutContent a[href^="mailto:support@cabon14.com"]');
+              r.aboutSource = !!document.querySelector('#aboutContent a.about-source[href*="github.com/scabon/netstral"]');
               r.aboutLiberapay = !!document.querySelector('#aboutContent a.donate-liberapay[href*="liberapay.com/cabon14"]');
               r.aboutTipeee = !!document.querySelector('#aboutContent a.donate-tipeee[href*="tipeee.com/cabon14"]');
               r.aboutNoTab = (document.body.dataset.tabsCreate || '').indexOf('pages/') === -1;
@@ -429,8 +430,8 @@ def main() -> int:
             and disp.get("changelogDisplay") == "flex"
             and disp.get("mainDisplayChangelog") == "none"
             and disp.get("settingsDisplayChangelog") == "none"
-            and disp.get("changelogEntries") == 3
-            and "v1.0.2" in disp.get("changelogTop", "")
+            and disp.get("changelogEntries") == 4
+            and "v1.0.3" in disp.get("changelogTop", "")
             and disp.get("backFromChangelog") is True
             and disp.get("changelogDisplayBack") == "none"
             and disp.get("menuIcons") == 4
@@ -448,6 +449,7 @@ def main() -> int:
             and "0.5.0" in disp.get("aboutBrand", "")
             and disp.get("aboutSite") is True
             and disp.get("aboutSupport") is True
+            and disp.get("aboutSource") is True
             and disp.get("aboutLiberapay") is True
             and disp.get("aboutTipeee") is True
             and disp.get("aboutNoTab") is True

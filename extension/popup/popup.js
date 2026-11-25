@@ -449,6 +449,17 @@ function buildAbout() {
   support.textContent = t("support_email");
   supportLine.append(supportLabel, support);
 
+  const sourceLine = document.createElement("p");
+  const sourceLabel = document.createElement("span");
+  sourceLabel.textContent = `${t("source_label")} `;
+  const source = document.createElement("a");
+  source.href = "https://github.com/scabon/netstral";
+  source.target = "_blank";
+  source.rel = "noreferrer";
+  source.className = "about-source";
+  source.textContent = "github.com/scabon/netstral";
+  sourceLine.append(sourceLabel, source);
+
   const donateH = document.createElement("h2");
   donateH.textContent = t("donate_title");
   const donateRow = document.createElement("div");
@@ -467,7 +478,7 @@ function buildAbout() {
   tipeee.textContent = t("donate_tipeee");
   donateRow.append(liberapay, tipeee);
 
-  frag.append(brand, versionLine, tagline, note, siteLine, storesLine, supportLine, donateH, donateRow);
+  frag.append(brand, versionLine, tagline, note, siteLine, storesLine, supportLine, sourceLine, donateH, donateRow);
   el.replaceChildren(frag);
 }
 buildHelp();

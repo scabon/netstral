@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Netstral",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Suivez la consommation de votre compte Mistral (badge % sur l'icône, détail dans la pop-up) et ouvrez chat.mistral.ai en un clic.",
   "minimum_chrome_version": "116",
   "browser_specific_settings": {

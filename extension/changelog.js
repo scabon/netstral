@@ -4,6 +4,10 @@
 // La première entrée doit matcher la version du manifest (tools/check-changelog.py).
 window.NetstralChangelog = [
   {
+    h: "v1.0.3 — Lien Source vers le dépôt GitHub",
+    p: "La vue À propos affiche désormais un lien « Source : github.com/scabon/netstral » vers le code source de l'extension, désormais public.",
+  },
+  {
     h: "v1.0.2 — Notif « quota réinitialisé » encore plus fiabilisée",
     p: "La notification de reset ne se déclenche désormais que quand la période de facturation avance réellement : une lecture de resetAt invalide (nombre 0/epoch — Date.parse(0) vaut l'an 2000 et passait le filtre de la v1.0.1, chaîne illisible, date antérieure à 2020), une oscillation entre sources (plan Vibe vs allocation API) ou une clé de période héritée d'une ancienne version ne déclenchent plus jamais la notification, et ne peuvent plus écraser la période connue. Un vrai changement de cycle (ex. 2026-12-01 -> 2027-01-01) notifie toujours une seule fois.",
   },
