@@ -7,3 +7,4 @@ __pycache__/
 Thumbs.db
 web-ext-artifacts/
 .scratchpad/
+.amo-upload-uuid
